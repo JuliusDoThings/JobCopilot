@@ -1,0 +1,18 @@
+# Local environments and secrets
+.venv/
+.env
+.env.*
+*.pem
+*.key
+
+# Python caches and build artifacts
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+*.egg-info/
+build/
+dist/
+
+# Editor and OS files
+.DS_Store
