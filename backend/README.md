@@ -2,6 +2,47 @@
 
 Base FastAPI minimale, sans base de données ni intégration LLM.
 
+## Extraction structurée de CV
+
+`POST /api/v1/cv/extract` reçoit un objet JSON :
+
+```json
+{"cv_text": "CV entièrement fictif : projet Python et formation informatique."}
+```
+
+`cv_text` est une chaîne obligatoire. Les espaces en début et fin sont supprimés
+avec `strip()` avant de vérifier une longueur de 1 à 20 000 caractères inclus.
+Une entrée invalide reçoit HTTP 422.
+
+Le contrat de réponse HTTP 200 est :
+
+```json
+{"skills": ["Python"], "experiences": ["Projet fictif"], "education": []}
+```
+
+Ces trois champs sont obligatoires et contiennent des listes de chaînes ; les
+listes vides sont autorisées. Cet exemple illustre uniquement le schéma.
+
+**Aucun fournisseur LLM n'est configuré actuellement.** Une requête valide en
+exécution normale retourne HTTP 503 avec :
+
+```json
+{"detail": "CV extraction service is not configured."}
+```
+
+Le endpoint et ses réponses sont décrits dans `/docs` et `/openapi.json`.
+Utiliser exclusivement des CV fictifs pour cette étape, sans clés API.
+
+Les tests injectent un `FakeExtractor` via `app.dependency_overrides`. Il retourne
+un profil prédéfini et mémorise le texte reçu pour vérifier la normalisation,
+sans appel réseau ni simulation de LLM. Les overrides sont restaurés après
+chaque test. Les tests couvrent également la validation, les frontières de
+longueur après `strip()`, les listes vides, HTTP 503 et OpenAPI. Le test `/health`
+est conservé.
+
+Voir la [note d'architecture](docs/cv-extraction.md) pour le contrat fournisseur
+et son évolution vers Azure OpenAI.
+
 ## Installer les dépendances
 
 Prérequis : [uv](https://docs.astral.sh/uv/) et Python 3.12 (version indiquée

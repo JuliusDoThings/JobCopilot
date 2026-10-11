@@ -1,0 +1,11 @@
+# Local environments and secrets across the monorepo
+.venv/
+.env
+.env.*
+*.pem
+*.key
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.DS_Store
