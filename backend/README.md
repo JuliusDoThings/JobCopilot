@@ -1,6 +1,6 @@
 # AI Job Copilot — Backend
 
-Base FastAPI minimale, sans base de données ni intégration LLM.
+Backend FastAPI minimal avec extraction Azure OpenAI optionnelle, sans base de données.
 
 ## Extraction structurée de CV
 
@@ -23,8 +23,7 @@ Le contrat de réponse HTTP 200 est :
 Ces trois champs sont obligatoires et contiennent des listes de chaînes ; les
 listes vides sont autorisées. Cet exemple illustre uniquement le schéma.
 
-**Aucun fournisseur LLM n'est configuré actuellement.** Une requête valide en
-exécution normale retourne HTTP 503 avec :
+**Sans configuration Azure**, une requête valide retourne HTTP 503 avec :
 
 ```json
 {"detail": "CV extraction service is not configured."}
@@ -41,7 +40,100 @@ longueur après `strip()`, les listes vides, HTTP 503 et OpenAPI. Le test `/heal
 est conservé.
 
 Voir la [note d'architecture](docs/cv-extraction.md) pour le contrat fournisseur
-et son évolution vers Azure OpenAI.
+et les choix de l'intégration Azure OpenAI.
+
+## Configurer Azure OpenAI en local
+
+Le SDK `openai` utilise Responses et l'API Azure **v1 GA**, sans variable
+`AZURE_OPENAI_API_VERSION`. `AZURE_OPENAI_DEPLOYMENT` désigne le nom du déploiement
+(`gpt-4.1-mini` ici), pas un nom de projet Foundry. L'endpoint est celui de la
+ressource, par exemple `https://your-resource.openai.azure.com`, ou son URL
+complète finissant par `/openai/v1/`.
+
+**Ni l'application ni `uv run` ne chargent automatiquement `.env`.** Aucun
+chargeur dotenv n'est installé. Pour charger explicitement un fichier local,
+depuis `backend/` :
+
+```sh
+cp .env.example .env
+chmod 600 .env
+```
+
+Modifier `.env` dans un éditeur local avec l'endpoint de la ressource, le nom du
+déploiement et la clé Azure. Les valeurs du modèle sont fictives. Ne jamais
+copier la vraie clé dans une commande, un chat, une capture ou un fichier suivi.
+Le fichier `.env` est ignoré par Git ; seul `.env.example` peut être versionné.
+
+Lancer ensuite avec le chargement explicite fourni par uv :
+
+```sh
+uv run --env-file .env uvicorn job_copilot_api.main:app --reload
+```
+
+Ne pas utiliser `set -x`, `OPENAI_LOG=debug` ou des logs HTTP détaillés : les logs
+de diagnostic tiers peuvent contenir des données sensibles. Notre code ne logue
+ni le CV, ni la réponse brute, ni la clé. L'exemple suivant utilise uniquement
+un CV fictif et n'expose pas la clé au client HTTP :
+
+```sh
+curl --fail-with-body http://127.0.0.1:8000/api/v1/cv/extract \
+  -H 'Content-Type: application/json' \
+  -d '{"cv_text":"CV entièrement fictif. Compétence maîtrisée : Python. Formation : licence fictive en informatique."}'
+```
+
+Avec une configuration valide et un fournisseur accessible, la réponse est HTTP
+200 avec les trois listes du profil. Cet appel est **payant** et envoie le texte
+à Azure. Ne pas utiliser de vrais CV pour cette expérimentation. L'authentification
+Microsoft Entra ID, évitant une clé longue durée, est une évolution ultérieure.
+
+| Situation | HTTP | Message |
+| --- | --- | --- |
+| Entrée invalide | 422 | Erreur de validation FastAPI |
+| Configuration absente, partielle ou invalide | 503 | `CV extraction service is not configured.` |
+| Connexion, quota ou indisponibilité fournisseur | 503 | `CV extraction provider is unavailable.` |
+| Timeout fournisseur | 504 | `CV extraction provider timed out.` |
+| Réponse invalide ou incomplète | 502 | `CV extraction provider returned an invalid response.` |
+| Refus du modèle | 502 | `CV extraction was refused by the provider.` |
+| Autre erreur fournisseur, dont authentification | 502 | `CV extraction failed.` |
+
+Le client synchrone fixe `timeout=30.0`, `max_retries=1` (deux tentatives au plus)
+et `max_output_tokens=2000`. Aucune boucle de retry applicative. Le timeout est
+par opération réseau ; les retries et délais serveur peuvent allonger la durée
+totale. Une sortie tronquée n'est pas retournée comme succès. Le SDK est verrouillé
+à `openai 2.54.0`, et les tests vérifient réellement son plafond de tentatives.
+
+## Évaluation LLM manuelle, explicitement opt-in
+
+Les tests pytest sont déterministes et bloquent les appels HTTP externes. Ils
+vérifient les contrats et les erreurs, pas la qualité sémantique du modèle.
+Le fichier `evaluation/fictional_cvs.json` contient quatre CV entièrement fictifs
+avec leurs compétences attendues : développeur, analyste, intentions d'apprentissage
+et instructions parasites à ignorer.
+
+Pour exécuter **quatre appels potentiellement payants**, jamais lancés par pytest
+ni automatiquement en CI :
+
+```sh
+uv run --env-file .env python scripts/evaluate_cv_extraction.py --allow-paid-requests
+```
+
+Sans le drapeau, le script refuse tout appel. Il utilise uniquement le jeu fourni,
+affiche les scores par identifiant et ne journalise ni CV ni réponse brute.
+Un retry SDK peut augmenter le nombre de tentatives jusqu'à huit pour quatre CV.
+
+La **précision** est la proportion de compétences extraites qui sont attendues ;
+le **rappel** est la proportion de compétences attendues qui sont extraites.
+Le script compare des ensembles après suppression des espaces et conversion en
+minuscules, sans résoudre les synonymes. Par convention, le rappel vaut 1 si
+aucune compétence n'est attendue ; la précision vaut 1 si les deux ensembles
+sont vides, et 0 si aucune compétence n'est extraite alors qu'une est attendue.
+Les expériences et formations ne sont pas notées dans cette évaluation initiale.
+
+Quatre exemples ne constituent pas une mesure représentative. Le schéma strict
+garantit la structure, pas l'absence d'hallucination ni une défense parfaite contre
+les instructions parasites. Aucun juge LLM n'est utilisé. L'accès réel dépend
+de la région, de la version du déploiement, des droits et quotas Azure ; les tests
+simulés ne le confirment pas.
 
 ## Installer les dépendances
 

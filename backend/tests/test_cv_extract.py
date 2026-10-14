@@ -127,7 +127,7 @@ def test_openapi_exposes_extraction(client: TestClient) -> None:
 
     assert response.status_code == 200
     operation = response.json()["paths"]["/api/v1/cv/extract"]["post"]
-    assert set(operation["responses"]) == {"200", "422", "503"}
+    assert set(operation["responses"]) == {"200", "422", "502", "503", "504"}
     assert operation["responses"]["200"]["content"]["application/json"]["schema"] == {
         "$ref": "#/components/schemas/CVProfile"
     }
