@@ -2,7 +2,7 @@
 
 from typing import Annotated
 
-from pydantic import BaseModel, StringConstraints
+from pydantic import BaseModel, ConfigDict, StringConstraints
 
 
 class CVExtractRequest(BaseModel):
@@ -13,6 +13,8 @@ class CVExtractRequest(BaseModel):
 
 
 class CVProfile(BaseModel):
+    model_config = ConfigDict(extra="forbid", strict=True)
+
     skills: list[str]
     experiences: list[str]
     education: list[str]
