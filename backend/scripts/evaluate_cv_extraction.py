@@ -22,7 +22,8 @@ def main() -> int:
         return 1
     cases_path = Path(__file__).resolve().parents[1] / "evaluation/fictional_cvs.json"
     cases = json.loads(cases_path.read_text())
-    failed = False
+    successes = 0
+    precision_sum = recall_sum = 0.0
     with create_azure_client(settings) as client:
         extractor = AzureCVExtractor(client, settings.deployment)
         for case in cases:
@@ -31,15 +32,29 @@ def main() -> int:
                 profile = extractor.extract(request.cv_text)
             except ExtractionError as exc:
                 print(f"{case['id']}: {exc.public_message}")
-                failed = True
                 continue
             actual = {skill.strip().casefold() for skill in profile.skills}
             expected = {skill.casefold() for skill in case["expected_skills"]}
             true_positives = len(actual & expected)
             precision = true_positives / len(actual) if actual else float(not expected)
             recall = true_positives / len(expected) if expected else 1.0
+            successes += 1
+            precision_sum += precision
+            recall_sum += recall
             print(f"{case['id']}: precision={precision:.2f}, recall={recall:.2f}")
-    return int(failed)
+    print(
+        f"Technical summary: {successes}/{len(cases)} succeeded; "
+        f"{len(cases) - successes} failed."
+    )
+    if successes:
+        print(
+            f"Business quality (macro average over {successes} successful cases): "
+            f"precision={precision_sum / successes:.2f}, "
+            f"recall={recall_sum / successes:.2f}"
+        )
+    else:
+        print("Business quality: not available (no successful extraction).")
+    return int(successes != len(cases))
 
 
 if __name__ == "__main__":

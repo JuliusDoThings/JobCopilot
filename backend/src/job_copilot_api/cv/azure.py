@@ -8,6 +8,7 @@ from openai import (
     APIResponseValidationError,
     APIStatusError,
     APITimeoutError,
+    DefaultHttpxClient,
     OpenAI,
 )
 from pydantic import ValidationError
@@ -36,6 +37,7 @@ def create_azure_client(settings: AzureSettings) -> OpenAI:
         api_key=settings.api_key,
         timeout=30.0,
         max_retries=1,
+        http_client=DefaultHttpxClient(follow_redirects=False),
     )
 
 
