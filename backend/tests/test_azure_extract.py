@@ -234,6 +234,8 @@ def test_client_configuration() -> None:
     [
         "https://fictional.openai.azure.com",
         "https://fictional.openai.azure.com/openai/v1/",
+        "https://fictional.services.ai.azure.com",
+        "https://fictional.services.ai.azure.com/openai/v1/",
     ],
 )
 def test_environment_selects_azure(

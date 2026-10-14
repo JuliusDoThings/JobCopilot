@@ -15,7 +15,9 @@ variables du processus ; une configuration absente, partielle ou invalide
 conserve l'adaptateur non configuré, sans empêcher le démarrage. L'endpoint doit
 être celui de la ressource Azure, pas l'URL du projet Foundry.
 La validation impose HTTPS et un unique nom de ressource sous
-`openai.azure.com`, sans port autre que 443, identifiants, paramètres ou fragment.
+`openai.azure.com` ou `services.ai.azure.com`, sans port autre que 443,
+identifiants, paramètres ou fragment. Dans les deux cas, `/openai/v1/` est ajouté
+une seule fois, même si la configuration contient déjà ce chemin.
 Elle s'applique aussi à la construction directe de `AzureSettings`. Les
 redirections du client de production sont désactivées pour éviter une seconde
 destination non validée. Cette restriction ne permet ni domaines personnalisés

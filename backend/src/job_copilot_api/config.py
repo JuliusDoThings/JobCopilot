@@ -6,7 +6,8 @@ from dataclasses import dataclass, field
 
 AZURE_ENDPOINT = re.compile(
     r"https://[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?"
-    r"\.openai\.azure\.com(?::443)?(?:/openai/v1)?/?",
+    r"\.(?:openai\.azure\.com|services\.ai\.azure\.com)"
+    r"(?::443)?(?:/openai/v1)?/?",
     re.ASCII,
 )
 

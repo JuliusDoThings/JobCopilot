@@ -8,6 +8,7 @@ from job_copilot_api.cv.errors import ExtractionError
 from job_copilot_api.main import app
 
 
+@pytest.mark.parametrize("domain", ["openai.azure.com", "services.ai.azure.com"])
 @pytest.mark.parametrize(
     "endpoint",
     [
@@ -30,11 +31,13 @@ from job_copilot_api.main import app
         "https://resource.openai.azure.com//",
     ],
 )
-def test_unsafe_endpoint_rejected(endpoint: str) -> None:
+def test_unsafe_endpoint_rejected(endpoint: str, domain: str) -> None:
+    endpoint = endpoint.replace("openai.azure.com", domain)
     with pytest.raises(ValueError, match="endpoint is not allowed"):
         AzureSettings(endpoint, "gpt-4.1-mini", "fictional-key")
 
 
+@pytest.mark.parametrize("domain", ["openai.azure.com", "services.ai.azure.com"])
 @pytest.mark.parametrize(
     "endpoint",
     [
@@ -45,9 +48,11 @@ def test_unsafe_endpoint_rejected(endpoint: str) -> None:
         "https://my-resource-123.openai.azure.com/openai/v1",
     ],
 )
-def test_allowed_endpoint(endpoint: str) -> None:
+def test_allowed_endpoint(endpoint: str, domain: str) -> None:
+    endpoint = endpoint.replace("openai.azure.com", domain)
     settings = AzureSettings(endpoint, "gpt-4.1-mini", "fictional-key")
-    assert settings.base_url.endswith("/openai/v1/")
+    resource_url = endpoint.split("/openai/v1")[0].rstrip("/")
+    assert settings.base_url == resource_url + "/openai/v1/"
 
 
 def test_invalid_domain_never_creates_sdk(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -66,7 +71,10 @@ def test_invalid_domain_never_creates_sdk(monkeypatch: pytest.MonkeyPatch) -> No
     assert response.status_code == 503
 
 
-def test_redirect_cannot_forward_cv_or_key(monkeypatch: pytest.MonkeyPatch) -> None:
+@pytest.mark.parametrize("domain", ["openai.azure.com", "services.ai.azure.com"])
+def test_redirect_cannot_forward_cv_or_key(
+    monkeypatch: pytest.MonkeyPatch, domain: str
+) -> None:
     requests: list[httpx.Request] = []
 
     def redirect(self: httpx.HTTPTransport, request: httpx.Request) -> httpx.Response:
@@ -75,10 +83,10 @@ def test_redirect_cannot_forward_cv_or_key(monkeypatch: pytest.MonkeyPatch) -> N
 
     monkeypatch.setattr(httpx.HTTPTransport, "handle_request", redirect)
     settings = AzureSettings(
-        "https://resource.openai.azure.com", "gpt-4.1-mini", "fictional-key"
+        f"https://resource.{domain}", "gpt-4.1-mini", "fictional-key"
     )
     with create_azure_client(settings) as sdk:
         with pytest.raises(ExtractionError):
             AzureCVExtractor(sdk, settings.deployment).extract("CV fictif")
     assert len(requests) == 1
-    assert requests[0].url.host == "resource.openai.azure.com"
+    assert requests[0].url.host == f"resource.{domain}"
