@@ -50,6 +50,15 @@ Le SDK `openai` utilise Responses et l'API Azure **v1 GA**, sans variable
 ressource, par exemple `https://your-resource.openai.azure.com`, ou son URL
 complète finissant par `/openai/v1/`.
 
+La configuration accepte uniquement les URLs HTTPS en minuscules de la forme
+`https://<ressource>.openai.azure.com`, avec le port 443 implicite ou explicite,
+et le chemin vide, `/` ou `/openai/v1/` (barre finale facultative pour ce dernier).
+Les domaines arbitraires, IP, identifiants dans l'URL, paramètres et fragments
+sont refusés avant de créer le client ; les redirections HTTP sont désactivées.
+Les domaines personnalisés et les clouds souverains ne sont pas pris en charge
+par cette liste volontairement restreinte. Le client simulé reste injectable
+directement dans les tests, sans assouplir la configuration de production.
+
 **Ni l'application ni `uv run` ne chargent automatiquement `.env`.** Aucun
 chargeur dotenv n'est installé. Pour charger explicitement un fichier local,
 depuis `backend/` :
@@ -128,6 +137,15 @@ minuscules, sans résoudre les synonymes. Par convention, le rappel vaut 1 si
 aucune compétence n'est attendue ; la précision vaut 1 si les deux ensembles
 sont vides, et 0 si aucune compétence n'est extraite alors qu'une est attendue.
 Les expériences et formations ne sont pas notées dans cette évaluation initiale.
+
+La synthèse technique indique le nombre de succès et d'échecs sur tous les cas.
+La synthèse métier donne une moyenne **macro** : chaque extraction réussie pèse
+autant dans la moyenne de précision et de rappel. Les échecs techniques sont
+exclus de ces moyennes et leur nombre reste visible pour ne pas masquer une
+couverture partielle. Sans succès, les scores sont indiqués comme indisponibles.
+Les conventions sur les ensembles vides s'appliquent aussi aux moyennes.
+Le code de sortie est 1 en cas d'échec technique, 0 si tous les appels ont réussi,
+même si la qualité est faible. Aucun seuil de qualité n'est imposé.
 
 Quatre exemples ne constituent pas une mesure représentative. Le schéma strict
 garantit la structure, pas l'absence d'hallucination ni une défense parfaite contre

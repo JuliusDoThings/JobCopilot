@@ -14,6 +14,12 @@ OpenAI 2.54.0 et Responses sur l'API Azure v1 GA. `config.py` lit uniquement les
 variables du processus ; une configuration absente, partielle ou invalide
 conserve l'adaptateur non configuré, sans empêcher le démarrage. L'endpoint doit
 être celui de la ressource Azure, pas l'URL du projet Foundry.
+La validation impose HTTPS et un unique nom de ressource sous
+`openai.azure.com`, sans port autre que 443, identifiants, paramètres ou fragment.
+Elle s'applique aussi à la construction directe de `AzureSettings`. Les
+redirections du client de production sont désactivées pour éviter une seconde
+destination non validée. Cette restriction ne permet ni domaines personnalisés
+ni clouds souverains ; l'injection d'un client simulé reste indépendante.
 
 La dépendance construit le client à la demande et le ferme après la requête.
 La route synchrone `def` est exécutée dans le pool de threads de FastAPI : l'appel
