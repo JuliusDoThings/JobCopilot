@@ -51,7 +51,8 @@ ressource, par exemple `https://your-resource.openai.azure.com`, ou son URL
 complète finissant par `/openai/v1/`.
 
 La configuration accepte uniquement les URLs HTTPS en minuscules de la forme
-`https://<ressource>.openai.azure.com`, avec le port 443 implicite ou explicite,
+`https://<ressource>.openai.azure.com` ou
+`https://<ressource>.services.ai.azure.com`, avec le port 443 implicite ou explicite,
 et le chemin vide, `/` ou `/openai/v1/` (barre finale facultative pour ce dernier).
 Les domaines arbitraires, IP, identifiants dans l'URL, paramètres et fragments
 sont refusés avant de créer le client ; les redirections HTTP sont désactivées.
