@@ -447,3 +447,154 @@ def test_adapter_revalidates_injected_client():
         )
         with pytest.raises(InvalidExtractionError):
             AzureJobExtractor(fake, "gpt-4.1-mini").extract(JOB_TEXT)
+
+
+@pytest.mark.parametrize(
+    "cv_text,cv_skills,job_text,required,score",
+    [
+        (
+            "Développeuse backend. Compétences techniques : Python, FastAPI, Git. "
+            "Développement d'API REST avec Python et FastAPI.",
+            ["Python", "FastAPI", "Git"],
+            "Compétences obligatoires : maîtrise de Python ; expérience avec Docker. "
+            "Compétences facultatives : Git et Kubernetes.",
+            ["Python", "Docker"],
+            50.0,
+        ),
+        (
+            "Compétences techniques : SQL et Git.",
+            ["SQL", "Git"],
+            "Compétences obligatoires : maîtrise de Python ; expérience avec Docker.",
+            ["Python", "Docker"],
+            0.0,
+        ),
+        (
+            "Compétences techniques : Python et Docker.",
+            ["Python", "Docker"],
+            "Compétences obligatoires : maîtrise de Python ; expérience avec Docker.",
+            ["Python", "Docker"],
+            100.0,
+        ),
+        (
+            "Compétences techniques : Git et Kubernetes.",
+            ["Git", "Kubernetes"],
+            "Compétences facultatives : Git et Kubernetes.",
+            [],
+            None,
+        ),
+        (
+            "Compétence technique : Python.",
+            ["Python"],
+            "Compétences obligatoires : expérience avec Docker. Python non requis.",
+            ["Docker"],
+            0.0,
+        ),
+        ("Compétence technique : Python.", ["Python"], "Python non requis.", [], None),
+        ("Compétence technique : Python.", ["Python"], "Python apprécié.", [], None),
+        (
+            "Compétence technique : Python.",
+            ["Python"],
+            "Python ou Java, et expérience avec Docker obligatoire.",
+            ["Docker"],
+            0.0,
+        ),
+    ],
+)
+def test_skill_name_extraction_contract_and_matching_replay(
+    client, install_sdk, cv_text, cv_skills, job_text, required, score
+):
+    """Replay intended extractions, not a model-quality or live Azure test."""
+    from job_copilot_api.cv.azure import AzureCVExtractor
+    from job_copilot_api.cv.service import get_cv_extractor
+    from job_copilot_api.jobs.azure import EXTRACTION_INSTRUCTIONS
+    from job_copilot_api.matching.service import match_skills
+
+    requests = []
+    cv_text = "CV entièrement fictif. " + cv_text
+    job_text = "Annonce entièrement fictive. " + job_text
+    profile = {"skills": cv_skills, "experiences": [], "education": []}
+
+    def handler(request):
+        body = json.loads(request.content)
+        requests.append(body)
+        text = body["input"][1]["content"]
+        assert text in (cv_text, job_text)
+        result = profile if text == cv_text else {"required_skills": required}
+        return httpx.Response(200, json=sdk_response(result))
+
+    sdk = install_sdk(handler)
+    app.dependency_overrides[get_cv_extractor] = lambda: AzureCVExtractor(
+        sdk, "gpt-4.1-mini"
+    )
+    # Inspect the two extraction contracts separately before their composition.
+    cv_response = client.post("/api/v1/cv/extract", json={"cv_text": cv_text})
+    job_response = client.post("/api/v1/jobs/extract", json={"job_text": job_text})
+    assert cv_response.status_code == job_response.status_code == 200
+    assert cv_response.json() == profile
+    assert job_response.json() == {"required_skills": required}
+    if required:
+        direct = match_skills(cv_response.json()["skills"], required)
+        assert direct.score == score
+    response = client.post(
+        "/api/v1/matching/analyze", json={"cv_text": cv_text, "job_text": job_text}
+    )
+    assert response.status_code == 200
+    if score is None:
+        assert response.json() == {
+            "status": "not_scorable",
+            "score": None,
+            "matched_skills": [],
+            "missing_skills": [],
+            "reason": "no_explicit_required_skills",
+        }
+    else:
+        assert response.json() == {
+            "status": "scored",
+            **direct.model_dump(),
+            "reason": None,
+        }
+    assert len(requests) == 4
+    for body in (requests[1], requests[3]):
+        assert body["input"] == [
+            {"role": "system", "content": EXTRACTION_INSTRUCTIONS},
+            {"role": "user", "content": job_text},
+        ]
+        assert body["store"] is False
+        instructions = body["input"][0]["content"]
+        # Assert the actual correction reaches the wire, not just a mock result.
+        assert "Return only the skill name, not the requirement phrase." in instructions
+        assert "'maîtrise de Python' return 'Python'" in instructions
+        assert "'expérience avec Docker'" in instructions
+        assert "'Python non requis'" in instructions
+        assert "without Git or Kubernetes" in instructions
+        assert (
+            "Do not\nreduce JavaScript to Java or Docker Compose to Docker."
+            in instructions
+        )
+
+
+def test_reported_false_negative_is_a_label_mismatch():
+    from job_copilot_api.cv.schemas import CVProfile
+    from job_copilot_api.jobs.schemas import JobRequirements
+    from job_copilot_api.matching.service import match_skills
+
+    profile = CVProfile(
+        skills=["Python", "FastAPI", "Git"], experiences=[], education=[]
+    )
+    # Both forms are schema-valid; Pydantic does not establish semantic equivalence.
+    verbose = JobRequirements(
+        required_skills=["maîtrise de Python", "expérience avec Docker"]
+    )
+    canonical = JobRequirements(required_skills=["Python", "Docker"])
+    before = match_skills(profile.skills, verbose.required_skills)
+    after = match_skills(profile.skills, canonical.required_skills)
+    assert before.model_dump() == {
+        "score": 0.0,
+        "matched_skills": [],
+        "missing_skills": ["expérience avec docker", "maîtrise de python"],
+    }
+    assert after.model_dump() == {
+        "score": 50.0,
+        "matched_skills": ["python"],
+        "missing_skills": ["docker"],
+    }

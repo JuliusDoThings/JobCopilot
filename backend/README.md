@@ -61,12 +61,16 @@ Les champs supplémentaires, types incorrects et textes blancs sont rejetés en
 HTTP 422. La réponse stricte `JobRequirements` exige `required_skills: list[str]`
 et refuse les champs supplémentaires. Une liste vide est une extraction valide
 lorsqu'aucune compétence explicitement obligatoire n'est identifiable. Les
-libellés extraits sont conservés, sans synonymes ni normalisation métier ; le
-matching applique ensuite ses propres règles. Aucune nouvelle borne de liste ou
+noms de compétences explicites sont extraits sans leur formulation d'exigence :
+« maîtrise de Python » donne `Python`, « expérience avec Docker » donne `Docker`
+uniquement si ces exigences sont obligatoires. Le libellé du nom est conservé,
+sans synonymes ; les noms composés et ponctuations distinctives restent intacts
+(`Docker Compose`, `gestion de projet`, `C++`, `C#`). Le matching applique ensuite
+ses propres règles. Aucune nouvelle borne de liste ou
 de longueur des compétences n'est imposée à cette sortie.
 
 Les instructions d'extraction excluent les compétences souhaitées, facultatives,
-appréciées, simplement contextuelles ou ambiguës. Une alternative non résolue
+appréciées, explicitement non requises, simplement contextuelles ou ambiguës. Une alternative non résolue
 comme « Python ou Java » est omise, mais les exigences indépendantes sont
 conservées : « Python ou Java, et Docker obligatoire » attend uniquement Docker.
 **Cette omission peut sous-estimer les exigences réelles** : le contrat plat ne
@@ -556,3 +560,12 @@ variables Azure et bloque les transports HTTP externes standards. Les tests SDK
 utilisent des transports simulés et des clés fictives, jamais un compte Azure.
 Aucun secret Azure, aucun `--env-file .env` et aucun script d'évaluation payant
 ne sont utilisés par le workflow. Aucun appel Azure réel n'est nécessaire.
+
+## Diagnostic du faux négatif S3-003
+
+La [note de diagnostic](docs/skill-matching-diagnosis.md) reproduit le 0 % avec des
+libellés d'exigences phrastiques et le 50 % avec des noms de compétences seuls.
+La correction cible les instructions d'extraction des offres ; le matcher exact
+et les contrats publics restent inchangés. Les tests rejouent des sorties simulées
+et vérifient les instructions envoyées, sans démontrer la conformité future du
+modèle Azure. Aucun appel réel n'a été effectué pour cette correction.
