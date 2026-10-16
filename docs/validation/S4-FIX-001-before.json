@@ -1,0 +1,78 @@
+[
+  {
+    "id": "QA-001",
+    "input": {
+      "cv_text": "Je n’ai pas utilisé Docker.\nDéveloppement d’API avec Python.",
+      "target_skills": [
+        "Python"
+      ]
+    },
+    "http_status": 200,
+    "actual": [
+      {
+        "skill": "Python",
+        "status": "no_evidence",
+        "evidence": null,
+        "suggestion": null,
+        "clarification_question": null
+      }
+    ]
+  },
+  {
+    "id": "QA-002",
+    "input": {
+      "cv_text": "Développement d’API avec Python.\nObjectif : apprendre Azure.",
+      "target_skills": [
+        "Python"
+      ]
+    },
+    "http_status": 200,
+    "actual": [
+      {
+        "skill": "Python",
+        "status": "needs_clarification",
+        "evidence": "Développement d’API avec Python.",
+        "suggestion": null,
+        "clarification_question": "Quelle activité avez-vous réalisée avec Python, et quel était votre rôle exact ?"
+      }
+    ]
+  },
+  {
+    "id": "negative",
+    "input": {
+      "cv_text": "Je n’ai pas utilisé Python.",
+      "target_skills": [
+        "Python"
+      ]
+    },
+    "http_status": 200,
+    "actual": [
+      {
+        "skill": "Python",
+        "status": "no_evidence",
+        "evidence": null,
+        "suggestion": null,
+        "clarification_question": null
+      }
+    ]
+  },
+  {
+    "id": "learning",
+    "input": {
+      "cv_text": "Objectif : apprendre Python.",
+      "target_skills": [
+        "Python"
+      ]
+    },
+    "http_status": 200,
+    "actual": [
+      {
+        "skill": "Python",
+        "status": "needs_clarification",
+        "evidence": "Objectif : apprendre Python.",
+        "suggestion": null,
+        "clarification_question": "Quelle activité avez-vous réalisée avec Python, et quel était votre rôle exact ?"
+      }
+    ]
+  }
+]
