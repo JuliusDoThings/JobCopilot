@@ -1,7 +1,7 @@
 [
   {
     "id": "explicit",
-    "job_text": "Annonce entièrement fictive. Compétences obligatoires : Python et FastAPI.",
+    "job_text": "Annonce entièrement fictive. Compétences obligatoires : maîtrise de Python ; expérience avec FastAPI.",
     "expected_required_skills": [
       "Python",
       "FastAPI"
@@ -9,7 +9,7 @@
   },
   {
     "id": "preferred",
-    "job_text": "Annonce entièrement fictive. Python obligatoire. SQL apprécié, Docker souhaité, Git facultatif.",
+    "job_text": "Annonce entièrement fictive. Python obligatoire. SQL apprécié, Docker souhaité, Git facultatif. Kubernetes non requis.",
     "expected_required_skills": [
       "Python"
     ]
