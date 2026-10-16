@@ -255,3 +255,71 @@ def test_every_generated_fact_is_exactly_quoted_from_source(skill: str) -> None:
     assert result.evidence in cv
     assert result.suggestion == result.evidence
     assert result.clarification_question is None
+
+
+@pytest.mark.parametrize(
+    ("cv", "status", "evidence"),
+    [
+        (
+            "Je n’ai pas utilisé Docker.\nDéveloppement d’API avec Python.",
+            "suggested",
+            "Développement d’API avec Python.",
+        ),
+        (
+            "Développement d’API avec Python.\nObjectif : apprendre Azure.",
+            "suggested",
+            "Développement d’API avec Python.",
+        ),
+        (
+            "Objectif : apprendre Azure.\nDéveloppement d’API avec Python.",
+            "suggested",
+            "Développement d’API avec Python.",
+        ),
+        (
+            "Développement d’API avec Python.\nJe n’ai pas utilisé Docker.",
+            "suggested",
+            "Développement d’API avec Python.",
+        ),
+        ("Je n’ai pas utilisé Python.", "no_evidence", None),
+        ("Aucune expérience :\nPython", "no_evidence", None),
+        (
+            "Objectif : apprendre Python.",
+            "needs_clarification",
+            "Objectif : apprendre Python.",
+        ),
+        (
+            "Objectif :\nDéveloppement d’API avec Python.",
+            "needs_clarification",
+            "Développement d’API avec Python.",
+        ),
+        ("Aucune expérience :\nDéveloppement d’API avec Python.", "no_evidence", None),
+        (
+            "Objectif : Développement d’API avec Python.",
+            "needs_clarification",
+            "Objectif : Développement d’API avec Python.",
+        ),
+        (
+            "Je n’ai pas utilisé Python. Développement d’API avec Python.",
+            "no_evidence",
+            None,
+        ),
+        (
+            "Développement d’API avec Python et objectif apprendre Azure.",
+            "needs_clarification",
+            "Développement d’API avec Python et objectif apprendre Azure.",
+        ),
+    ],
+)
+def test_api_context_scope(cv: str, status: str, evidence: str | None) -> None:
+    with TestClient(app) as client:
+        response = client.post(
+            "/api/v1/cv/valorization",
+            json={"cv_text": cv, "target_skills": ["Python"]},
+        )
+    assert response.status_code == 200
+    result = response.json()[0]
+    assert result["status"] == status
+    assert result["evidence"] == evidence
+    assert result["suggestion"] == (evidence if status == "suggested" else None)
+    if evidence is not None:
+        assert evidence in cv
