@@ -2,6 +2,115 @@
 
 Backend FastAPI minimal avec extraction Azure OpenAI optionnelle, sans base de données.
 
+## Valorisation déterministe du CV
+
+`POST /api/v1/cv/valorization` met en avant uniquement des informations déjà
+présentes dans le CV, pour une liste explicite de compétences ciblées. Ce service
+est indépendant du matching et des extracteurs. Aucun appel Azure ou FastAPI
+externe, aucune configuration Azure, aucun coût Azure, aucun stockage.
+
+Requête entièrement fictive :
+
+```json
+{
+  "cv_text": "Développement d'API Python.\nCompétences : SQL",
+  "target_skills": ["Python", "SQL", "Docker"]
+}
+```
+
+Réponse HTTP 200 (liste, dans l'ordre des cibles, doublons conservés) :
+
+```json
+[
+  {
+    "skill": "Python",
+    "status": "suggested",
+    "evidence": "Développement d'API Python.",
+    "suggestion": "Développement d'API Python.",
+    "clarification_question": null
+  },
+  {
+    "skill": "SQL",
+    "status": "needs_clarification",
+    "evidence": "Compétences : SQL",
+    "suggestion": null,
+    "clarification_question": "Quelle activité avez-vous réalisée avec SQL, et quel était votre rôle exact ?"
+  },
+  {
+    "skill": "Docker",
+    "status": "no_evidence",
+    "evidence": null,
+    "suggestion": null,
+    "clarification_question": null
+  }
+]
+```
+
+Les champs et types sont stricts, les champs supplémentaires sont refusés (422).
+Le CV doit contenir 1 à 20 000 caractères **bruts** et ne pas être blanc. Il est
+conservé sans normalisation afin de garder des preuves traçables. Cette borne
+reprend le plafond existant, mais s'applique avant suppression des espaces.
+La liste contient de 1 à 100 compétences, chacune de 1 à 200 caractères bruts,
+non blanche ; seuls leurs espaces de début et fin sont supprimés.
+
+Les invariants Pydantic imposent :
+
+- `suggested` : preuve et suggestion non blanches, aucune question.
+- `needs_clarification` : preuve et question non blanches, aucune suggestion.
+- `no_evidence` : les trois champs optionnels valent `null`.
+
+Le service valide aussi chaque preuve contre le CV source : c'est toujours une
+sous-chaîne exacte, avec casse et ponctuation préservées. Le modèle peut être
+validé isolément avec `context={"cv_text": texte}` pour vérifier cette provenance ;
+sans ce contexte, seuls les invariants intrinsèques peuvent être vérifiés.
+
+### Politique prudente et limites de cette première version
+
+La recherche ignore la casse mais exige des frontières lexicales : Java ne
+correspond pas à JavaScript, SQL à PostgreSQL, ni C à C++/C#. Docker Compose
+est explicitement distingué de Docker dans les deux sens. Aucun synonyme,
+traduction ou rapprochement sémantique n'est appliqué : « conteneur » ne prouve
+pas Docker. Les variantes d'espacement d'un nom composé ne sont pas normalisées.
+
+Le texte est découpé aux sauts de ligne, points-virgules, `!` et `?`. Les points
+restent dans les segments pour préserver notamment .NET et les versions. Les
+segments contenant les marqueurs de négation français/anglais reconnus sont
+écartés, ainsi que le segment immédiatement suivant, par prudence envers les
+titres négatifs. Cela peut écarter une mention positive indépendante. Ce filtre
+ne prétend pas analyser toutes les négations ni leur portée linguistique.
+
+Une liste ou une expérience vague entraîne `needs_clarification`. Pour éviter
+une reformulation inventive, **la suggestion V1 est une reprise verbatim de la
+preuve**, destinée à sa mise en avant ; même Pydantic refuse une suggestion
+différente de sa preuve. Aucun ajout de niveau, responsabilité, réalisation,
+résultat chiffré ou compétence. Aucune description de poste n'est acceptée comme
+champ de requête ou utilisée pour générer des faits.
+
+Seuls des segments entiers de formes fermées permettent `suggested` :
+`Développement d'API <compétence>`, `Développement d'API avec <compétence>`,
+`Déploiement avec <compétence>`, `Automatisation avec <compétence>`,
+`Developed API(s) with <compétence>`, `Deployed applications with <compétence>`
+et `Automated tasks with <compétence>`, avec point final facultatif et apostrophe
+droite ou typographique. Les formulations composées, puces, détails libres,
+niveaux et métriques restent à clarifier, même s'ils semblent exploitables à un
+lecteur humain. Une activité explicite est préférée à une simple mention.
+
+Les marqueurs reconnus de contexte hypothétique, d'objectif, d'exemple ou de
+formation dans le CV entier empêchent toute suggestion et favorisent une
+clarification. C'est volontairement très restrictif : une section « Formation »
+peut ainsi empêcher une suggestion ailleurs. Les règles ne comprennent pas
+toutes les nuances d'un CV et ne vérifient pas la véracité des déclarations.
+Un texte d'offre ou un exemple collé dans le champ CV peut être impossible à
+distinguer d'une déclaration personnelle ; fournir uniquement le CV dans ce champ.
+
+`no_evidence` signifie qu'aucune preuve positive exploitable n'a été retenue,
+pas que la personne ne possède pas la compétence. Une clarification est une
+question retournée à l'appelant, **pas une conversation interactive** : aucune
+réponse utilisateur n'est recueillie ni mémorisée. Cette fonctionnalité ne change
+ni le score ni les endpoints d'extraction et d'analyse existants. Ses tests sont
+entièrement hors ligne, avec la fixture réseau commune ; ils ne valident aucune
+qualité d'extraction Azure.
+
 ## Extraction structurée de CV
 
 `POST /api/v1/cv/extract` reçoit un objet JSON :
