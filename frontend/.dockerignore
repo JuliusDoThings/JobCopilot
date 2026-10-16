@@ -1,0 +1,14 @@
+**
+!Dockerfile
+!.dockerignore
+!package.json
+!package-lock.json
+!tsconfig.json
+!app/
+!app/**
+!lib/
+!lib/**
+!scripts/
+!scripts/**
+**/.env*
+**/node_modules/**
