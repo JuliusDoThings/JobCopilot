@@ -122,8 +122,8 @@ Depuis `backend/`, créer un fichier local de prédictions simulées au format :
 uv run python scripts/evaluate_job_extraction.py --predictions /tmp/job-predictions.json
 ```
 
-Ce script ne construit aucun client Azure et n'a aucun mode payant. Les identifiants
-doivent couvrir chaque cas exactement une fois ; `requirements: null` indique
+En mode `--predictions`, ce script ne construit aucun client Azure et ne lit pas
+la configuration Azure. Les identifiants doivent couvrir chaque cas exactement une fois ; `requirements: null` indique
 un échec technique, distinct d'une liste extraite vide. Le rapport JSON imprimé
 contient les scores par cas, faux positifs/négatifs et moyennes macro sur les
 succès uniquement ; sans succès, les moyennes valent `null`. Les textes bruts et
@@ -139,6 +139,57 @@ est la moyenne des F1 individuels. Aucun framework fournisseur n'est introduit.
 Ces simulations vérifient les calculs et le transport SDK, pas le modèle réel.
 Le script CV conserve son verrou `--allow-paid-requests` ; aucun appel réel n'est
 nécessaire pour les tests et les vérifications S2-002.
+
+### Évaluation Azure réelle, explicitement autorisée (S2-003)
+
+Le même script propose un mode réel, mutuellement exclusif avec `--predictions`.
+Sans l'un des deux modes, il termine avec le code 2 avant de créer un client ou
+lancer une requête. Les tests et la CI utilisent uniquement des mocks : ne jamais
+y lancer une évaluation réelle. Les commandes ci-dessous sont destinées à une
+exécution manuelle ultérieure et impliquent des appels potentiellement payants.
+Depuis `backend/`, avec une configuration Azure locale valide :
+
+```sh
+uv run --env-file .env python scripts/evaluate_job_extraction.py --allow-paid-requests
+```
+
+Export local optionnel, également disponible en mode hors ligne :
+
+```sh
+uv run --env-file .env python scripts/evaluate_job_extraction.py --allow-paid-requests --json-output /tmp/job-report.json
+uv run python scripts/evaluate_job_extraction.py --predictions /tmp/job-predictions.json --json-output /tmp/job-report.json
+```
+
+Le corpus complet est validé avant toute création de client. Le mode réel utilise
+`AzureSettings`, la fabrique sécurisée partagée et `AzureJobExtractor`, avec le
+même déploiement que les endpoints d'extraction. **Un appel d'extraction par
+annonce est prévu**, soit huit appels ; `max_retries=1` autorise jusqu'à deux
+tentatives par appel, donc jusqu'à seize tentatives réseau au total. Aucun retry
+applicatif n'est ajouté. Le client est fermé même lorsqu'une extraction échoue.
+
+Le format JSON du rapport console reste identique à celui du mode hors ligne.
+Une erreur d'extraction produit `technical_failure` avec `skills: null`, jamais
+une liste vide factice ; les cas suivants sont quand même traités. Une extraction
+vide valide reste un succès technique. Les moyennes macro portent uniquement sur
+les succès techniques, sans seuil de qualité métier. Le code de sortie vaut 1 en
+cas d'échec technique, configuration invalide, erreur de lecture ou d'écriture,
+et 0 si toutes les extractions réussissent techniquement. Une erreur SDK lors de
+la gestion du client entraîne un message fixe sans rapport complet. Les erreurs
+inattendues de programmation ne sont pas transformées en extractions.
+
+`--json-output` écrit le même rapport dans un fichier UTF-8, en remplaçant le
+fichier s'il existe. Ne pas cibler un fichier du projet ; le corpus et le fichier
+de prédictions sont explicitement protégés contre cet écrasement. Le rapport
+contient seulement identifiants, statuts, métriques et différences de compétences.
+Il exclut les annonces complètes, la configuration et les exceptions fournisseur
+brutes. Les échos de documents et des valeurs de configuration connues sont
+masqués avant affichage et export. Aucun texte brut ni secret n'est journalisé
+par le script ; ne pas activer les logs HTTP/SDK de diagnostic.
+
+Huit annonces fictives donnent une **première mesure exploratoire**, pas une
+garantie de qualité en production. Les conventions lexicales ne reconnaissent
+pas les synonymes ; les alternatives non résolues restent volontairement omises.
+Aucun résultat Azure réel n'est produit lors du développement ou des tests S2-003.
 
 ## Matching déterministe des compétences
 
