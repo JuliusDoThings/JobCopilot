@@ -234,6 +234,77 @@ pas modifiés : `C`, `C++` et `C#` sont distincts. Les expériences et formation
 ne participent pas au calcul. Les fonctions métier sont pures et les tests restent
 entièrement hors ligne, avec blocage du réseau externe.
 
+## Analyse CV → offre → matching
+
+`POST /api/v1/matching/analyze` orchestre les deux extractions, puis réutilise le
+matching déterministe existant. Les deux champs sont obligatoires et stricts :
+
+```json
+{
+  "cv_text": "CV entièrement fictif. Compétence maîtrisée : Python.",
+  "job_text": "Annonce entièrement fictive. Python et SQL obligatoires."
+}
+```
+
+Chaque texte est nettoyé avec `strip()` puis doit contenir entre 1 et 20 000
+caractères. Les types incorrects, champs absents ou supplémentaires et textes
+blancs sont rejetés en HTTP 422. Les contrats des autres endpoints sont inchangés.
+
+Exemple de réponse HTTP 200 si les extractions identifient Python côté candidat
+et Python/SQL côté offre :
+
+```json
+{
+  "status": "scored",
+  "score": 50.0,
+  "matched_skills": ["python"],
+  "missing_skills": ["sql"],
+  "reason": null
+}
+```
+
+Si aucune compétence obligatoire explicite n'est extraite de l'offre (ou si sa
+liste ne contient que des chaînes blanches), la réponse HTTP 200 est :
+
+```json
+{
+  "status": "not_scorable",
+  "score": null,
+  "matched_skills": [],
+  "missing_skills": [],
+  "reason": "no_explicit_required_skills"
+}
+```
+
+Ces deux états forment une union Pydantic stricte discriminée par `status`.
+Un résultat `scored` possède un score numérique entre 0 et 100 et `reason: null`.
+Un candidat sans correspondance obtient **0.0**, tandis qu'une offre sans
+exigences identifiables produit **null**, pas un score arbitraire de 0 ou 100.
+
+L'orchestration est synchrone et séquentielle : CV, offre, puis matching. Les deux
+extracteurs sont injectés par les dépendances FastAPI existantes. Au premier échec
+d'extraction, aucun score n'est retourné : 503 pour configuration absente/invalide
+ou indisponibilité, 504 pour timeout, 502 pour refus, sortie invalide/incomplète
+ou autre erreur fournisseur. Les messages publics fixes restent ceux du domaine
+CV ou offre ; aucune exception fournisseur brute n'est renvoyée. Les clients
+ouverts par les dépendances sont fermés même si une extraction échoue. Aucun
+retry applicatif, cache ou stockage n'est ajouté.
+
+Une analyse peut effectuer **deux extractions Azure potentiellement payantes**.
+Avec un retry SDK par extraction, jusqu'à quatre tentatives réseau sont possibles.
+Un échec CV empêche l'appel d'extraction de l'offre ; les clients peuvent néanmoins
+être créés par les dépendances avant l'exécution de la route. La durée peut cumuler
+les attentes des deux extractions et de leurs retries, sans échéance globale.
+Les tests utilisent uniquement des faux extracteurs et clients, sans Azure réel.
+
+Les extractions restent probabilistes et peuvent omettre ou inventer des éléments
+malgré les instructions. Le matching mesure seulement la **couverture lexicale
+des compétences explicitement obligatoires**, jamais une probabilité d'embauche.
+Il conserve les règles `strip().casefold()`, déduplication et tri du moteur
+existant, sans synonymes ni rapprochement sémantique. Les alternatives obligatoires
+non résolues ne sont pas représentées et leur omission peut sous-estimer les
+exigences réelles. Les expériences et formations ne participent pas au score.
+
 ## Configurer Azure OpenAI en local
 
 Le SDK `openai` utilise Responses et l'API Azure **v1 GA**, sans variable
