@@ -50,24 +50,35 @@ def valorize_cv(cv_text: str, target_skills: list[str]) -> list[Recommendation]:
     # A context heading can govern the next line. Prefer omission over treating
     # a negative heading followed by a skill list as positive evidence.
     positive_segments = [
-        text
+        (text, segments[index - 1] if index else "")
         for index, text in enumerate(segments)
         if not NEGATION.search(text)
-        and not (index and NEGATION.search(segments[index - 1]))
+        and not (
+            index
+            and NEGATION.search(segments[index - 1])
+            and not segments[index - 1].endswith(".")
+        )
     ]
     results = []
     for skill in request.target_skills:
-        candidates = [text for text in positive_segments if _mentions(text, skill)]
+        candidates = [
+            (text, previous)
+            for text, previous in positive_segments
+            if _mentions(text, skill)
+        ]
         explicit = next(
             (
                 text
-                for text in candidates
-                if not UNCERTAIN_CONTEXT.search(cv_text)
+                for text, previous in candidates
+                if not UNCERTAIN_CONTEXT.search(text)
+                and not (
+                    UNCERTAIN_CONTEXT.search(previous) and not previous.endswith(".")
+                )
                 and _explicit_activity(text, skill)
             ),
             None,
         )
-        evidence = explicit or next(iter(candidates), None)
+        evidence = explicit or (candidates[0][0] if candidates else None)
         status = (
             "suggested"
             if explicit
