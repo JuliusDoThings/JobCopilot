@@ -169,3 +169,22 @@ def test_matching_without_azure_or_network(client, monkeypatch):
     )
     assert response.status_code == 200
     assert response.json()["score"] == 100.0
+
+
+@pytest.mark.parametrize(
+    "candidate,required",
+    [
+        ("Python", "CPython"),
+        ("Java", "JavaScript"),
+        ("Docker", "Docker Compose"),
+        ("Git", "GitLab"),
+        ("C", "C++"),
+        ("C++", "C#"),
+    ],
+)
+def test_partial_names_never_match(candidate, required):
+    for actual, wanted in ((candidate, required), (required, candidate)):
+        result = match_skills([actual], [wanted])
+        assert result.score == 0.0
+        assert result.matched_skills == []
+        assert result.missing_skills == [wanted.casefold()]
