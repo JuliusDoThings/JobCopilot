@@ -15,8 +15,8 @@ const corpus = JSON.parse(await readFile(new URL("lib/dev-bench/corpus.json", ro
 const comparator = await readFile(new URL("lib/dev-bench/compare.ts", root), "utf8");
 const runner = (await readFile(new URL("lib/dev-bench/execute.ts", root), "utf8")).replace('import { isRecommendations } from "./compare";', "");
 const { outputText } = ts.transpileModule(comparator + "\n" + runner, { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.ESNext } });
-const { compare, executeScenario } = await import("data:text/javascript;base64," + Buffer.from(outputText).toString("base64"));
-const report = { corpusVersion: corpus.version, exportedAt: new Date().toISOString(), endpoint: "http://127.0.0.1:8000/api/v1/cv/valorization", scenarios: [] };
+const { compare, executeScenario, getApiEndpoint } = await import("data:text/javascript;base64," + Buffer.from(outputText).toString("base64"));
+const report = { corpusVersion: corpus.version, exportedAt: new Date().toISOString(), endpoint: getApiEndpoint() || "invalid configuration", scenarios: [] };
 for (const scenario of corpus.scenarios) {
   const execution = await executeScenario(scenario);
   const comparison = compare(scenario, execution);

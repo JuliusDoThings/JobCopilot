@@ -9,7 +9,8 @@ export function localRequest(request: Request): boolean {
     // Next may reconstruct request.url with localhost while the browser uses
     // 127.0.0.1. Compare against the real Host header, never forwarded headers.
     const host = request.headers.get("host") || url.host;
-    return ["127.0.0.1", "localhost", "[::1]"].includes(url.hostname) &&
+    const publicHost = new URL(`${url.protocol}//${host}`).hostname;
+    return ["127.0.0.1", "localhost", "[::1]"].includes(publicHost) &&
       ["127.0.0.1", "localhost", "[::1]"].includes(origin.hostname) &&
       origin.host === host && origin.protocol === url.protocol &&
       origin.origin === request.headers.get("origin");
