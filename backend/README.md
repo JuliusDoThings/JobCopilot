@@ -42,6 +42,49 @@ est conservé.
 Voir la [note d'architecture](docs/cv-extraction.md) pour le contrat fournisseur
 et les choix de l'intégration Azure OpenAI.
 
+## Matching déterministe des compétences
+
+`POST /api/v1/matching/skills` compare deux listes sans appel Azure, LLM,
+stockage ni configuration fournisseur. Les deux champs sont obligatoires :
+
+```json
+{
+  "candidate_skills": [" Python ", "SQL", "Git", "PYTHON"],
+  "required_skills": ["Python", "SQL", "FastAPI"]
+}
+```
+
+Réponse HTTP 200 :
+
+```json
+{
+  "score": 66.66666666666667,
+  "matched_skills": ["python", "sql"],
+  "missing_skills": ["fastapi"]
+}
+```
+
+Les deux listes sont normalisées avec `strip().casefold()` ; les chaînes devenues
+vides sont ignorées et les doublons supprimés. Les compétences retournées sont
+normalisées et triées lexicographiquement, indépendamment de l'ordre des entrées.
+Le score vaut `100.0 * len(matched) / len(required_distinct)`, sans arrondi métier.
+Les compétences supplémentaires du candidat ne diminuent pas le score. Un candidat
+sans compétence non blanche obtient 0 si les exigences sont valides.
+
+Chaque liste accepte au maximum **1 000 éléments** et chaque chaîne au maximum
+**200 caractères bruts**. Ces bornes sont contrôlées avant normalisation, y compris
+pour les doublons, les espaces périphériques et les chaînes entièrement blanches.
+Les champs absents ou supplémentaires, les listes ou éléments mal typés (sans
+conversion), les dépassements et les exigences sans compétence non blanche
+retournent HTTP 422. Le contrat est également décrit dans `/docs` et `/openapi.json`.
+
+Ce score mesure uniquement la couverture littérale des compétences requises ;
+**ce n'est pas une probabilité d'embauche**. Il n'y a ni synonymes, ni matching
+sémantique, ni pondération. Les espaces internes, accents et ponctuations ne sont
+pas modifiés : `C`, `C++` et `C#` sont distincts. Les expériences et formations
+ne participent pas au calcul. Les fonctions métier sont pures et les tests restent
+entièrement hors ligne, avec blocage du réseau externe.
+
 ## Configurer Azure OpenAI en local
 
 Le SDK `openai` utilise Responses et l'API Azure **v1 GA**, sans variable
