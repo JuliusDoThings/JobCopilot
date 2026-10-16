@@ -42,6 +42,104 @@ est conservé.
 Voir la [note d'architecture](docs/cv-extraction.md) pour le contrat fournisseur
 et les choix de l'intégration Azure OpenAI.
 
+## Extraction des compétences obligatoires d'une offre
+
+`POST /api/v1/jobs/extract` accepte une requête stricte :
+
+```json
+{"job_text": "Annonce entièrement fictive. Python obligatoire. SQL apprécié."}
+```
+
+Réponse HTTP 200 illustrative :
+
+```json
+{"required_skills": ["Python"]}
+```
+
+`job_text` est une chaîne obligatoire de 1 à 20 000 caractères après `strip()`.
+Les champs supplémentaires, types incorrects et textes blancs sont rejetés en
+HTTP 422. La réponse stricte `JobRequirements` exige `required_skills: list[str]`
+et refuse les champs supplémentaires. Une liste vide est une extraction valide
+lorsqu'aucune compétence explicitement obligatoire n'est identifiable. Les
+libellés extraits sont conservés, sans synonymes ni normalisation métier ; le
+matching applique ensuite ses propres règles. Aucune nouvelle borne de liste ou
+de longueur des compétences n'est imposée à cette sortie.
+
+Les instructions d'extraction excluent les compétences souhaitées, facultatives,
+appréciées, simplement contextuelles ou ambiguës. Une alternative non résolue
+comme « Python ou Java » est omise, mais les exigences indépendantes sont
+conservées : « Python ou Java, et Docker obligatoire » attend uniquement Docker.
+**Cette omission peut sous-estimer les exigences réelles** : le contrat plat ne
+représente pas les alternatives. Le modèle ne doit inventer aucune compétence et
+les instructions parasites de l'annonce sont traitées comme des données non
+fiables. Le schéma strict ne garantit pas la justesse métier ni une défense
+parfaite contre ces instructions ; les tests simulés ne prouvent pas la qualité
+réelle du modèle.
+
+L'offre utilise le même déploiement `AZURE_OPENAI_DEPLOYMENT` que le CV
+(`gpt-4.1-mini` prévu), la même configuration validée et la même fabrique de client.
+Aucun service Azure supplémentaire. L'adaptateur offre est distinct : Responses
+v1, `text_format=JobRequirements`, `store=False`, 2 000 tokens de sortie maximum,
+timeout de 30 secondes par opération, un retry SDK maximum, redirections
+interdites. Le client est fermé après la requête, y compris en cas d'échec.
+L'application ne journalise ni annonce brute, ni réponse brute, ni clé ; ne pas
+activer les logs de diagnostic HTTP/SDK contenant ces données. `store=False` ne
+constitue pas une garantie générale de rétention nulle chez Azure.
+
+| Situation | HTTP | Message public fixe |
+| --- | --- | --- |
+| Entrée invalide | 422 | Validation FastAPI/Pydantic |
+| Configuration absente ou invalide | 503 | `Job extraction service is not configured.` |
+| Connexion, quota, fournisseur indisponible | 503 | `Job extraction provider is unavailable.` |
+| Timeout | 504 | `Job extraction provider timed out.` |
+| Réponse invalide ou incomplète | 502 | `Job extraction provider returned an invalid response.` |
+| Refus | 502 | `Job extraction was refused by the provider.` |
+| Autre erreur fournisseur | 502 | `Job extraction failed.` |
+
+### Corpus d'offres et évaluation hors ligne
+
+`evaluation/fictional_jobs.json` contient huit annonces entièrement fictives et
+leurs `expected_required_skills` : exigences explicites, souhaits, contexte,
+absence d'exigences, ambiguïté, alternative avec exigence indépendante, anglais
+et instruction parasite. Aucun document personnel réel n'est utilisé.
+
+Depuis `backend/`, créer un fichier local de prédictions simulées au format :
+
+```json
+[
+  {"id": "explicit", "requirements": {"required_skills": ["Python", "FastAPI"]}},
+  {"id": "preferred", "requirements": {"required_skills": ["Python"]}},
+  {"id": "context", "requirements": {"required_skills": ["Excel"]}},
+  {"id": "none", "requirements": {"required_skills": []}},
+  {"id": "ambiguous", "requirements": {"required_skills": []}},
+  {"id": "alternative", "requirements": {"required_skills": ["Docker"]}},
+  {"id": "english", "requirements": {"required_skills": ["Rust", "Git"]}},
+  {"id": "untrusted", "requirements": {"required_skills": ["SQL"]}}
+]
+```
+
+```sh
+uv run python scripts/evaluate_job_extraction.py --predictions /tmp/job-predictions.json
+```
+
+Ce script ne construit aucun client Azure et n'a aucun mode payant. Les identifiants
+doivent couvrir chaque cas exactement une fois ; `requirements: null` indique
+un échec technique, distinct d'une liste extraite vide. Le rapport JSON imprimé
+contient les scores par cas, faux positifs/négatifs et moyennes macro sur les
+succès uniquement ; sans succès, les moyennes valent `null`. Les textes bruts et
+détails fournisseur ne sont pas inclus. Utiliser exclusivement des prédictions
+synthétiques sans secrets. Le code de sortie est 1 pour entrée invalide ou échec
+technique, 0 pour succès techniques même de mauvaise qualité.
+
+Les petites fonctions de métriques sont partagées avec S1-003, sans changer ses
+résultats : `strip().casefold()`, ensembles, précision/rappel/F1. Si les deux
+ensembles sont vides, les trois scores valent 1 ; extrait vide seulement : trois
+scores à 0 ; attendu vide seulement : précision/F1 à 0, rappel à 1. Le F1 macro
+est la moyenne des F1 individuels. Aucun framework fournisseur n'est introduit.
+Ces simulations vérifient les calculs et le transport SDK, pas le modèle réel.
+Le script CV conserve son verrou `--allow-paid-requests` ; aucun appel réel n'est
+nécessaire pour les tests et les vérifications S2-002.
+
 ## Matching déterministe des compétences
 
 `POST /api/v1/matching/skills` compare deux listes sans appel Azure, LLM,
