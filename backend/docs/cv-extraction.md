@@ -69,3 +69,13 @@ Références vérifiées :
 Microsoft liste `gpt-4.1-mini` version `2025-04-14` comme compatible. La région,
 l'endpoint, les droits et la version du déploiement réel doivent être vérifiés
 par l'essai manuel : les tests logiciels ne prouvent pas cet accès.
+
+## Fabrique partagée avec les offres (S2-002)
+
+`azure_client.py` centralise uniquement la construction du client sécurisé.
+`cv/azure.py` réexporte `create_azure_client` pour préserver ses imports existants.
+Les adaptateurs CV et offre restent explicites et distincts, avec leurs propres
+schémas, instructions, dépendances et erreurs publiques. La configuration,
+les domaines autorisés et le comportement CV sont conservés. Les métriques de
+S1-003 sont déplacées sans changement dans `evaluation_metrics.py`, utilisé
+uniquement par les scripts d'évaluation, jamais par les adaptateurs.
