@@ -97,3 +97,8 @@ docker compose exec frontend node scripts/run-valorization-bench.mjs /tmp/valori
 
 Le code de sortie 1 est normal tant que VAL-007 diverge ; 2 indique une exécution
 incomplète. Télécharger les preuves via l’interface est plus simple pour le PO.
+
+## Développement et qualification
+
+Voir [le processus Work, QA et PO](docs/development-workflow.md).
+Les fonctionnalités ciblent `dev` ; la promotion vers `main` requiert l’accord PO.
