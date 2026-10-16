@@ -1,12 +1,4 @@
-# Local environments and secrets across the monorepo
-.venv/
-.env
-.env.*
-!.env.example
-*.pem
-*.key
-__pycache__/
-*.py[cod]
-.pytest_cache/
-.ruff_cache/
-.DS_Store
+
+# Local Compose smoke reports
+compose-smoke-report.json
+compose-unavailable-report.json

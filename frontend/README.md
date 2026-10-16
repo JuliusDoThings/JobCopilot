@@ -178,8 +178,11 @@ Ouvrir **http://127.0.0.1:3000/dev/valorization** puis cliquer sur
 métier, pas des échecs des tests du comparateur.
 
 Dans PowerShell, activer avec `$env:JOB_COPILOT_DEV_BENCH="1"` avant `npm run dev`.
-Aucune variable Azure n’est nécessaire. Le banc appelle uniquement
-`http://127.0.0.1:8000` ; il ignore intentionnellement `FASTAPI_BASE_URL`.
+Aucune variable Azure n’est nécessaire. Sans Compose, le banc appelle `http://127.0.0.1:8000`. Avec Compose, la variable
+serveur `JOB_COPILOT_BENCH_API_BASE=http://backend:8000` sélectionne le service
+Docker. Seules ces deux adresses exactes sont autorisées ; `FASTAPI_BASE_URL`
+reste réservé au formulaire d’analyse. Voir le README à la racine pour le
+démarrage Docker en une commande.
 Ne pas démarrer Next.js ou FastAPI avec `--host 0.0.0.0`, ne pas utiliser de tunnel
 ou de reverse proxy public pour ce banc. Le serveur de développement Next.js
 n’est pas une frontière d’authentification.

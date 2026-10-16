@@ -79,3 +79,19 @@ it("rejects a mismatched real Host header", async () => {
   expect(response.status).toBe(403);
   expect(fetch).not.toHaveBeenCalled();
 });
+
+it("calls the Docker backend through its service DNS, not browser loopback", async () => {
+  vi.stubEnv("JOB_COPILOT_BENCH_API_BASE", "http://backend:8000");
+  const fetcher = vi.fn().mockResolvedValue(Response.json(actual)); vi.stubGlobal("fetch", fetcher);
+  const response = await POST(new Request("http://0.0.0.0:3000/api/dev/valorization", { method: "POST", headers: { host: "localhost:3000", origin: "http://localhost:3000" }, body: JSON.stringify({ scenarioId: scenario.id }) }));
+  expect(response.status).toBe(200);
+  expect((await response.json()).outcome).toBe("executed");
+  expect(fetcher.mock.calls[0][0]).toBe("http://backend:8000/api/v1/cv/valorization");
+});
+it.each(["https://example.com", "http://secret:password@backend:8000", "http://backend:8000/?secret=key", "http://169.254.169.254"])("rejects arbitrary bench endpoints without exposing configuration", async endpoint => {
+  vi.stubEnv("JOB_COPILOT_BENCH_API_BASE", endpoint);
+  const result = await (await POST(request())).json();
+  expect(result.outcome).toBe("not_executed");
+  expect(fetch).not.toHaveBeenCalled();
+  expect(JSON.stringify(result)).not.toContain(endpoint);
+});
