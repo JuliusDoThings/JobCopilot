@@ -1,0 +1,1 @@
+"""Structured job requirements extraction."""
