@@ -116,43 +116,101 @@ totale. Une sortie tronquée n'est pas retournée comme succès. Le SDK est verr
 
 Les tests pytest sont déterministes et bloquent les appels HTTP externes. Ils
 vérifient les contrats et les erreurs, pas la qualité sémantique du modèle.
-Le fichier `evaluation/fictional_cvs.json` contient quatre CV entièrement fictifs
-avec leurs compétences attendues : développeur, analyste, intentions d'apprentissage
-et instructions parasites à ignorer.
+Le corpus unique `evaluation/fictional_cvs.json` contient **12 CV entièrement
+synthétiques** : développement, analyse, intentions d'apprentissage, instructions
+parasites, commerce, menuiserie, début de carrière, reconversion, carrière longue,
+anglais, variations de présentation et informations distractrices. Ce petit corpus
+ne constitue pas une mesure représentative de la qualité sur de vrais CV.
 
-Pour exécuter **quatre appels potentiellement payants**, jamais lancés par pytest
-ni automatiquement en CI :
+Chaque cas possède un identifiant stable, `cv_text`, `expected_skills`, ainsi que
+des attentes `experiences` et `education`. Ces dernières sont des métadonnées
+d'évaluation ; elles ne changent pas le contrat public `CVProfile` :
+
+```json
+{
+  "min_items": 1,
+  "max_items": 2,
+  "fragment_groups": [["Atlas", "2024"]]
+}
+```
+
+Le script valide intégralement le corpus avant toute création de client : 10 à 15
+cas (12 actuellement), identifiants uniques, entrées conformes à `CVExtractRequest`,
+compétences attendues non blanches, intervalles cohérents et groupes/fragments non
+vides. Une liste attendue vide (`max_items=0`) ne peut avoir de fragments.
+
+Depuis `backend/`, pour lancer **12 extractions potentiellement payantes**, jamais
+automatiquement par pytest ou la CI :
 
 ```sh
 uv run --env-file .env python scripts/evaluate_cv_extraction.py --allow-paid-requests
 ```
 
-Sans le drapeau, le script refuse tout appel. Il utilise uniquement le jeu fourni,
-affiche les scores par identifiant et ne journalise ni CV ni réponse brute.
-Un retry SDK peut augmenter le nombre de tentatives jusqu'à huit pour quatre CV.
+Export JSON optionnel, en complément du rapport console :
 
-La **précision** est la proportion de compétences extraites qui sont attendues ;
-le **rappel** est la proportion de compétences attendues qui sont extraites.
-Le script compare des ensembles après suppression des espaces et conversion en
-minuscules, sans résoudre les synonymes. Par convention, le rappel vaut 1 si
-aucune compétence n'est attendue ; la précision vaut 1 si les deux ensembles
-sont vides, et 0 si aucune compétence n'est extraite alors qu'une est attendue.
-Les expériences et formations ne sont pas notées dans cette évaluation initiale.
+```sh
+uv run --env-file .env python scripts/evaluate_cv_extraction.py --allow-paid-requests --json-output /tmp/cv-evaluation.json
+```
 
-La synthèse technique indique le nombre de succès et d'échecs sur tous les cas.
-La synthèse métier donne une moyenne **macro** : chaque extraction réussie pèse
-autant dans la moyenne de précision et de rappel. Les échecs techniques sont
-exclus de ces moyennes et leur nombre reste visible pour ne pas masquer une
-couverture partielle. Sans succès, les scores sont indiqués comme indisponibles.
-Les conventions sur les ensembles vides s'appliquent aussi aux moyennes.
-Le code de sortie est 1 en cas d'échec technique, 0 si tous les appels ont réussi,
-même si la qualité est faible. Aucun seuil de qualité n'est imposé.
+Sans `--allow-paid-requests`, aucun client n'est créé. Un retry SDK peut porter
+le nombre de tentatives jusqu'à 24 pour 12 extractions. Le fichier d'export est
+remplacé s'il existe ; il doit être distinct du corpus et des fichiers du projet.
 
-Quatre exemples ne constituent pas une mesure représentative. Le schéma strict
-garantit la structure, pas l'absence d'hallucination ni une défense parfaite contre
-les instructions parasites. Aucun juge LLM n'est utilisé. L'accès réel dépend
-de la région, de la version du déploiement, des droits et quotas Azure ; les tests
-simulés ne le confirment pas.
+Les compétences extraites et attendues sont comparées comme des ensembles après
+normalisation **symétrique `strip().casefold()`**, sans synonymes ni rapprochement
+approximatif. Les doublons n'affectent pas les scores ; `C`, `C++` et `C#` restent
+distincts. Avec A l'ensemble extrait et E l'ensemble attendu :
+
+- Vrais positifs : taille de A ∩ E.
+- Faux positifs : A − E ; faux négatifs : E − A, affichés triés par CV.
+- Précision : taille de A ∩ E divisée par taille de A.
+- Rappel : taille de A ∩ E divisée par taille de E.
+- F1 : `2 * précision * rappel / (précision + rappel)`, ou 0 si la somme est nulle.
+
+Conventions explicites pour les ensembles vides :
+
+| Extrait | Attendu | Précision | Rappel | F1 |
+| --- | --- | --- | --- | --- |
+| Vide | Vide | 1 | 1 | 1 |
+| Vide | Non vide | 0 | 0 | 0 |
+| Non vide | Vide | 0 | 1 | 0 |
+
+Pour les expériences et formations, le rapport expose uniquement des contrôles :
+
+- Cardinalité dans l'intervalle inclusif attendu, dont liste vide si `[0, 0]`.
+- Absence de chaînes blanches et de doublons après normalisation.
+- Présence de chaque groupe de fragments dans au moins un même élément de liste,
+  après `strip().casefold()`. Les groupes sont indépendants ; ils peuvent être
+  satisfaits par le même élément. Le rapprochement est une recherche de sous-chaîne.
+
+Le champ `passed` combine ces contrôles. **Il ne mesure pas une exactitude
+sémantique** : une reformulation peut échouer, une sous-chaîne peut correspondre
+fortuitement et des informations inventées peuvent passer les contrôles. Aucun
+juge LLM ni score sémantique n'est utilisé. Les intervalles tolèrent certains
+regroupements ou découpages du modèle ; ils ne définissent pas un format public.
+
+La synthèse technique compte tous les cas. Les moyennes **macro** de précision,
+rappel et F1 portent seulement sur les extractions techniquement réussies ; chaque
+cas pèse autant. Le F1 macro est la moyenne des F1 individuels, pas le F1 calculé
+sur les moyennes de précision et rappel. Sans succès, les moyennes valent `null`
+dans le JSON et sont indiquées indisponibles dans la console.
+
+Une réponse invalide, un refus ou une erreur fournisseur est un échec technique,
+avec catégorie fixe et métriques à `null` dans le JSON. Un profil conforme mais
+incorrect reste un succès technique, accompagné de ses scores et contrôles.
+Les rapports n'incluent ni texte complet des CV, ni profil brut, ni configuration,
+ni détails internes des exceptions fournisseur. Ils contiennent les différences
+de compétences normalisées et des booléens pour les contrôles de listes.
+
+Le code de sortie reste 0 si toutes les extractions réussissent techniquement,
+même avec une mauvaise qualité. Il vaut 1 en cas d'échec technique, de corpus ou
+configuration invalide, ou d'échec d'écriture du rapport ; l'absence d'autorisation
+vaut 2. Aucun seuil de qualité n'est imposé. Les exceptions inattendues de
+programmation ne sont pas converties en résultats d'extraction.
+
+Les tests utilisent des profils fixes et des extracteurs simulés, sans appel
+Azure. Ils vérifient le calcul et les rapports, pas la qualité réelle du modèle.
+L'accès Azure réel reste dépendant du déploiement, des droits et quotas.
 
 ## Installer les dépendances
 
