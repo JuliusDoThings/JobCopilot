@@ -1,0 +1,14 @@
+.shell { max-width: 1150px; margin: auto; padding: 40px 24px 80px; }
+.kicker { letter-spacing: .14em; font-size: 12px; color: #245f4b; font-weight: bold; }
+.toolbar, .heading { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 16px; }
+.toolbar { justify-content: flex-start; margin: 24px 0; }
+.card { background: white; border: 1px solid #dce1d8; border-radius: 16px; padding: 24px; margin: 24px 0; }
+.heading h2 { font-size: 22px; margin: 0; }
+.columns { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; border-block: 1px solid #dce1d8; margin-top: 20px; }
+.columns section { min-width: 0; }
+.shell pre { white-space: pre-wrap; overflow-wrap: anywhere; background: #f4f6f1; padding: 16px; border-radius: 8px; font-size: 13px; }
+.conforme, .ecart, .non_execute { border-radius: 20px; padding: 5px 14px; white-space: nowrap; }
+.conforme { color: #194e36; background: #e0f2e7; }
+.ecart, .error { color: #8b2820; background: #fff0ed; }
+.non_execute { color: #515a64; background: #edf0f3; }
+@media (max-width: 720px) { .columns { grid-template-columns: 1fr; gap: 0; } .shell h1 { font-size: 36px; } }
