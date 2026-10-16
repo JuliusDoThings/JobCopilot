@@ -99,6 +99,42 @@ par des mocks explicites : aucun backend, réseau externe ou appel Azure requis.
 L’installation des dépendances utilise le réseau ; le build ne charge aucune
 police ni ressource distante. Les tests ne prouvent pas la qualité du modèle réel.
 
+## CI GitHub Actions
+
+Le workflow `.github/workflows/backend-ci.yml` (« Backend and Frontend CI »)
+déclenche les jobs indépendants `backend-checks` et `frontend-checks` sur chaque
+Pull Request ciblant `main` et chaque push sur `main`, sans filtre de chemins.
+Les exécutions obsolètes d'une même PR ou branche sont annulées automatiquement.
+Les permissions sont limitées à `contents: read`.
+
+`frontend-checks` utilise `ubuntu-latest` et Node.js 22, lu depuis `.nvmrc`
+(le projet exige au moins 22.13.0 et déclare Next.js 16.4.2). Le cache npm est
+indexé par `frontend/package-lock.json`. Depuis `frontend/`, il exécute dans
+l'ordre :
+
+```sh
+npm ci
+npm test
+npm run typecheck
+npm run lint
+npm run build
+```
+
+`npm ci` installe les versions du lockfile existant sans le réécrire et échoue
+s'il est incohérent avec `package.json`. Chaque échec fait échouer le job,
+sans masquer les erreurs ; aucun job ne dépend du succès de l'autre.
+
+L'installation des outils et dépendances nécessite le réseau. Les tests utilisent
+exclusivement les mocks existants, sans FastAPI ni Azure réel ; le build ne
+télécharge aucune police ou ressource externe. Aucun fichier `backend/.env`,
+secret applicatif ou variable Azure n'est nécessaire. Ce workflow ne déploie
+rien sur Azure et ne déclenche aucune facturation Azure.
+
+Les tests hors ligne vérifient les contrats et les comportements avec des
+réponses simulées. Ils ne valident pas la qualité des extractions Azure.
+L'évaluation réelle du modèle est une opération manuelle distincte, explicitement
+opt-in et potentiellement payante, décrite dans le [README backend](../backend/README.md).
+
 ## Limites du prototype
 
 Le score mesure la couverture lexicale des compétences obligatoires identifiées,
