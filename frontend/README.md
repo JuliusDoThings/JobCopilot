@@ -146,3 +146,101 @@ et protection contre les abus** : limitation de débit, quotas de coût et règl
 de confidentialité devront être ajoutés avant toute ouverture publique. Le
 verrouillage du bouton ne remplace pas ces protections serveur. Aucun mécanisme
 de ce type n’est ajouté dans ce ticket.
+
+## Banc d’essai fonctionnel local — S4-VAL-001
+
+Le banc utilise le véritable endpoint FastAPI `POST /api/v1/cv/valorization`.
+Les 12 scénarios synthétiques et leurs attentes métier sont versionnés dans
+`frontend/lib/dev-bench/corpus.json`. Ils ne sont pas calculés depuis le moteur.
+L’attente de VAL-007 accepte une expérience formulée naturellement ; le moteur
+lexical actuel doit afficher un écart pour ce cas. Ne pas changer l’attente pour
+rendre le tableau vert. Le banc ne modifie aucune logique de valorisation.
+
+Depuis la racine du dépôt, terminal 1 (Python 3.12 et uv) :
+
+```bash
+cd backend
+uv sync --frozen
+uv run --no-sync uvicorn job_copilot_api.main:app --host 127.0.0.1 --port 8000
+```
+
+Terminal 2 (Node 22.13+ et npm), depuis la racine :
+
+```bash
+cd frontend
+npm ci
+JOB_COPILOT_DEV_BENCH=1 npm run dev
+```
+
+Ouvrir **http://127.0.0.1:3000/dev/valorization** puis cliquer sur
+« Exécuter tous les scénarios ». Le résultat de référence est actuellement
+**11 conformes, 1 écart (VAL-007), 0 non exécuté**. Les écarts sont des observations
+métier, pas des échecs des tests du comparateur.
+
+Dans PowerShell, activer avec `$env:JOB_COPILOT_DEV_BENCH="1"` avant `npm run dev`.
+Aucune variable Azure n’est nécessaire. Le banc appelle uniquement
+`http://127.0.0.1:8000` ; il ignore intentionnellement `FASTAPI_BASE_URL`.
+Ne pas démarrer Next.js ou FastAPI avec `--host 0.0.0.0`, ne pas utiliser de tunnel
+ou de reverse proxy public pour ce banc. Le serveur de développement Next.js
+n’est pas une frontière d’authentification.
+
+### Lecture et preuves
+
+Chaque carte expose l’ID, la justification métier, le CV synthétique, les cibles,
+les attentes, le résultat API et les différences champ par champ. Les suggestions
+et preuves doivent être des citations exactes du CV. Les questions sont vérifiées
+par présence, sans imposer une formulation exacte.
+
+- **Conforme** : réponse HTTP 200 exécutée et toutes les attentes satisfaites.
+- **Écart** : résultat API reçu mais différent ou incompatible avec le contrat.
+- **Non exécuté** : aucun appel effectué, panne réseau, délai de connexion ou erreur HTTP.
+
+Une relance efface l’ancien résultat des scénarios sélectionnés avant de commencer.
+Les boutons sont verrouillés pendant l’exécution séquentielle. Un résultat HTTP 200
+illisible ou hors contrat est un écart, jamais un succès. Les horodatages sont en
+UTC et les durées en millisecondes.
+
+« Exporter les preuves JSON » télécharge le corpus, sa version, les attentes,
+les résultats, HTTP, dates, durées, diagnostics et comparaisons. Aucun stockage
+serveur, cookie ou localStorage n’est utilisé ; recharger efface les résultats.
+L’export téléchargé est une preuve de session éditable, pas une attestation signée.
+Ne fournir que les scénarios synthétiques versionnés. Les corps d’erreur,
+exceptions et champs hors contrat sont masqués ; aucun secret ou configuration
+serveur n’est inclus. Taille de réponse limitée à 64 ko, délai API de 5 secondes.
+
+Pour conserver le même rapport sans navigateur, avec FastAPI déjà lancé :
+
+```bash
+cd frontend
+JOB_COPILOT_DEV_BENCH=1 node scripts/run-valorization-bench.mjs valorization-report.json
+```
+
+Code de sortie : 0 si tout est conforme, 1 s’il existe un écart métier,
+2 si un scénario n’a pas été exécuté. Arrêter FastAPI et relancer doit produire
+12 « non exécuté » et le code 2. Le script utilise le même comparateur et le même
+client HTTP que l’interface, sans mock. Les tests unitaires utilisent des mocks
+pour contrôler les pannes et les réponses adverses ; ce sont des preuves distinctes.
+
+### Accès et vérification
+
+La page et son proxy retournent 404 sauf si `NODE_ENV=development` **et**
+`JOB_COPILOT_DEV_BENCH=1`. En production (`npm run build` puis `npm start`),
+le banc reste désactivé même si le drapeau vaut 1. Le proxy refuse les origines
+externes, les hôtes non locaux, les identifiants inconnus et toute entrée libre.
+Le corpus n’est pas servi depuis `public/` et aucun lien n’est ajouté au produit.
+Ne pas modifier ces contrôles pour partager le serveur de développement.
+
+Depuis `frontend/` :
+
+```bash
+npm test
+npm run typecheck
+npm run lint
+npm run build
+```
+
+Les tests vérifient les comparaisons, les divergences, les preuves hors source,
+les chiffres inventés, les pannes, les délais, les réponses invalides, les gardes
+production et les anciens résultats verts lors d’une relance. La CI existante
+exécute ces tests sans accéder à Azure. Les rapports générés ne doivent pas être
+confondus avec les résultats des tests automatisés.
