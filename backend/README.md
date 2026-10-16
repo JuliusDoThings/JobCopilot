@@ -527,3 +527,32 @@ et versionner le verrouillage actualisé.
 `.gitignore` exclut `.venv/`, les fichiers `.env` et `.env.*`, les clés privées
 et les caches. Ne jamais placer de secrets dans le code ou les fichiers suivis.
 Aucun fichier `.env` n'est nécessaire pour démarrer cette base.
+
+## CI backend GitHub Actions
+
+Le workflow `.github/workflows/backend-ci.yml` exécute un unique job
+`backend-checks` sur chaque Pull Request ciblant `main` et chaque push sur `main`,
+sans filtre de chemins. Les exécutions obsolètes d'une même PR ou branche sont
+annulées automatiquement. Le workflow dispose uniquement de `contents: read`.
+
+Sur `ubuntu-latest`, il installe Python 3.12 et uv 0.13.0, puis exécute depuis
+`backend/` les mêmes commandes qu'en local :
+
+```sh
+uv sync --frozen
+uv run --no-sync pytest
+uv run --no-sync ruff check .
+uv run --no-sync ruff format --check .
+```
+
+`uv sync --frozen` installe les dépendances, y compris le groupe de développement,
+à partir de `pyproject.toml` et `uv.lock`, sans recalculer le verrouillage. Les
+contrôles suivants ne resynchronisent pas l'environnement. Un échec pytest ou
+Ruff fait échouer le job ; aucun déploiement ni service externe n'est ajouté.
+
+L'installation des outils et dépendances nécessite le réseau, mais **les tests
+restent hors ligne** : la fixture automatique `tests/conftest.py` retire les
+variables Azure et bloque les transports HTTP externes standards. Les tests SDK
+utilisent des transports simulés et des clés fictives, jamais un compte Azure.
+Aucun secret Azure, aucun `--env-file .env` et aucun script d'évaluation payant
+ne sont utilisés par le workflow. Aucun appel Azure réel n'est nécessaire.
