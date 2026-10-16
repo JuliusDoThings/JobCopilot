@@ -532,14 +532,15 @@ et versionner le verrouillage actualisé.
 et les caches. Ne jamais placer de secrets dans le code ou les fichiers suivis.
 Aucun fichier `.env` n'est nécessaire pour démarrer cette base.
 
-## CI backend GitHub Actions
+## CI backend et frontend GitHub Actions
 
-Le workflow `.github/workflows/backend-ci.yml` exécute un unique job
-`backend-checks` sur chaque Pull Request ciblant `main` et chaque push sur `main`,
+Le workflow `.github/workflows/backend-ci.yml` (« Backend and Frontend CI ») exécute
+les jobs indépendants `backend-checks` et `frontend-checks` sur chaque Pull Request
+ciblant `main` et chaque push sur `main`,
 sans filtre de chemins. Les exécutions obsolètes d'une même PR ou branche sont
 annulées automatiquement. Le workflow dispose uniquement de `contents: read`.
 
-Sur `ubuntu-latest`, il installe Python 3.12 et uv 0.13.0, puis exécute depuis
+Sur `ubuntu-latest`, `backend-checks` installe Python 3.12 et uv 0.13.0, puis exécute depuis
 `backend/` les mêmes commandes qu'en local :
 
 ```sh
@@ -560,6 +561,13 @@ variables Azure et bloque les transports HTTP externes standards. Les tests SDK
 utilisent des transports simulés et des clés fictives, jamais un compte Azure.
 Aucun secret Azure, aucun `--env-file .env` et aucun script d'évaluation payant
 ne sont utilisés par le workflow. Aucun appel Azure réel n'est nécessaire.
+
+`frontend-checks` installe Node.js 22 et exécute `npm ci`, `npm test`,
+`npm run typecheck`, `npm run lint` et `npm run build` depuis `frontend/` ;
+voir la [documentation frontend](../frontend/README.md#ci-github-actions).
+Un échec de l'un des jobs reste visible sans empêcher l'autre de s'exécuter.
+Ces contrôles hors ligne ne valident pas la qualité des extractions Azure ;
+l'évaluation réelle du modèle reste manuelle et explicitement opt-in.
 
 ## Diagnostic du faux négatif S3-003
 
