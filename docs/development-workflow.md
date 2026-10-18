@@ -1,46 +1,86 @@
-# Développement, QA et promotion — S4-OPS-001
+# Développement, QA et promotion — S4-OPS-002
 
-## État réellement vérifié le 16 octobre 2026
+## Politique autorisée et état vérifié le 18 octobre 2026
 
-- main : de4869f3f608a060741014fe58c1f56effa3c437 (PR #13).
-- CI push verte : https://github.com/JuliusDoThings/SASS-Emma/actions/runs/38934155325
-- dev créée exactement sur ce SHA après vérification de la CI.
-- Aucune PR ouverte au début de l'audit ; un seul workflow : backend-ci.yml.
-- API branches : protected=false pour toutes les branches, dont main.
-- API rulesets : 403, « Upgrade to GitHub Pro or make this repository public ».
-- Lecture branch protection : 403, « Resource not accessible by integration ».
-  Les permissions admin affichées dans les métadonnées du compte ne donnent
-  donc pas de capacité d'administration à cette connexion.
-- allow_auto_merge=false. Aucun auto-merge, bot de fusion ou jeton ajouté.
+Dépôt canonique : JuliusDoThings/JobCopilot. Le PO autorise Codex à fusionner
+les changements éligibles vers dev. Cette autorisation ne s'applique jamais
+à main et ne dispense pas de revue humaine des changements sensibles.
 
-**Les conventions ci-dessous ne constituent pas des protections GitHub.**
-Les contrôles CI ne sont pas vérifiés comme obligatoires. Les pushs directs,
-fusions sans CI et promotions sans accord PO ne sont pas techniquement bloqués
-pour les détenteurs d'un accès en écriture. Ne pas automatiser la fusion dans
-cet état. Le plan et la connexion actuels ne permettent pas de garantir les
-conditions de fusion demandées. Ne pas rendre public ce dépôt pour contourner
-cette limite.
+Flux : feature/* ou fix/* → PR vers dev → CI obligatoire → fusion par Codex
+si toutes les conditions sont satisfaites → QA indépendante sur dev → rapport
+→ validation PO du SHA qualifié → PR dev → main → fusion humaine.
 
-## Work : créer et intégrer une fonctionnalité
+Vérifications API GitHub (sans modification des règles) :
 
-1. Partir de dev à jour ; créer feature/<mission> ou fix/<mission>.
+- [protect-dev](https://github.com/JuliusDoThings/JobCopilot/rules/25336749) :
+  actif sur refs/heads/dev ; PR obligatoire, suppression et force-push interdits,
+  backend-checks/frontend-checks/compose-checks obligatoires (GitHub Actions,
+  integration_id=15368), zéro approbation exigée, branche à jour non imposée.
+- [defaultRules](https://github.com/JuliusDoThings/JobCopilot/rules/25336723) :
+  actif sur la branche par défaut main ; mêmes contrôles, branche à jour requise,
+  PR et une approbation obligatoires, suppression et force-push interdits.
+- Les deux rulesets déclarent bypass_actors=[] et current_user_can_bypass=never.
+- Ces règles n'imposent ni l'identité du PO sur main ni la revue des changements
+  sensibles sur dev ; elles n'empêchent pas à elles seules un agent de fusionner
+  main. Les obligations ci-dessous restent impératives pour Codex. Ne pas
+  présenter l'exclusivité PO ou la revue sensible comme garanties techniques.
+- L'endpoint des règles effectives par branche n'est pas accessible via le
+  connecteur actuel ; les conditions et contenus des deux rulesets ont été lus.
+- PR #16 déjà fusionnée par JuliusDoThings à 08:57:23 UTC : dev à
+  36a222531edcc4e0148a728ac76e34327dd7e494 ;
+  [CI push réussie](https://github.com/JuliusDoThings/JobCopilot/actions/runs/39113443225).
+  Aucun nouvel acte de fusion n'a été effectué pour cette PR par S4-OPS-002.
+
+Les constats S4-OPS-001 du 16 octobre (dépôt privé et règles non accessibles)
+sont historiques et ne décrivent plus l'état observé ci-dessus.
+
+## Work : développer et intégrer vers dev
+
+1. Vérifier dev distante et partir de son dernier SHA sur feature/<mission>
+   ou fix/<mission>. Avant chaque commit, vérifier git var GIT_AUTHOR_IDENT
+   et git var GIT_COMMITTER_IDENT : adresses GitHub noreply effectives.
 2. Développer une mission limitée et conserver les tests. Aucun secret ni appel
-   Azure payant dans les tests. Ouvrir une PR **vers dev**.
-3. Décrire comportement, critères d'acceptation, tests, risques, sensibilité et
-   limitations. Les changements sensibles nécessitent une revue humaine.
-4. En l'état, demander une fusion humaine. Vérifier sur la dernière version :
-   PR ouverte et non draft, aucun conflit, branche à jour avec dev, tous les
-   workflows et contrôles terminés avec succès, aucun contrôle requis ignoré,
-   aucune demande de modification non résolue. Après tout nouveau commit ou
-   changement de base, refaire les vérifications. Ne jamais utiliser un bypass.
-5. Vérifier la CI push de dev après fusion. CI rouge : suspendre les intégrations
-   et ouvrir un correctif ou une PR de revert vers dev.
+   Azure payant dans les tests. Ouvrir une PR vers dev avec critères, validation,
+   risques, sensibilité et limitations.
+3. Examiner tous les commits et le diff final. Sont sensibles : authentification,
+   autorisations, secrets, paiements, données personnelles (CV et journaux), Azure,
+   sécurité, permissions GitHub, CI, CODEOWNERS, AGENTS.md et cette politique.
+   Ils nécessitent une revue humaine explicite du SHA courant. Une autorisation
+   générale, un label ou une liste de chemins ne remplace pas cette revue.
+   Les PR des instructions et de la politique sont laissées ouvertes pour revue
+   humaine, sans fusion automatique.
+4. Juste avant une fusion autorisée par Codex : confirmer PR ouverte non draft,
+   cible dev, aucun conflit, fusionnabilité et rulesets respectés ; vérifier les
+   trois contrôles obligatoires et tout contrôle supplémentaire requis, tous
+   réussis sur le SHA à intégrer, sans contrôle requis ignoré. Examiner aussi
+   les reviews et discussions : aucune demande de modification non résolue.
+   Aucun commit supplémentaire non examiné ne doit être présent. Si le SHA,
+   la base ou le diff change, interrompre et refaire examen et contrôles ; une
+   revue humaine sensible doit porter sur le nouveau SHA. Un échec ou une
+   incertitude suspend la fusion et impose une nouvelle revue.
+5. Fusionner via l'API standard avec le SHA source attendu, uniquement vers dev,
+   sans bypass, jeton privilégié de contournement ni modification des protections.
+   Ne pas activer de fusion différée qui éviterait cette dernière vérification.
+6. Relever le SHA exact de dev après fusion et vérifier sa CI push. CI rouge :
+   suspendre les intégrations, préparer correctif ou PR de revert vers dev.
+   Ne pas supprimer la branche source sans nécessité et vérification d'activité.
+7. Faire qualifier dev par une QA indépendante de l'implémentation : testeur
+   humain ou session distincte, résultats et preuves liés au SHA exact. La CI
+   verte autorise l'intégration éligible ; elle ne vaut pas qualification produit.
 
-Sont sensibles au minimum : authentification, autorisations, secrets, paiements,
-données personnelles (dont CV et journaux), infrastructure Azure, workflows de
-sécurité, permissions GitHub. Inclure les modifications de CI, CODEOWNERS,
-AGENTS.md et de cette politique dans la revue humaine. Une simple liste de
-chemins ou un label ne prouve pas l'absence d'impact sensible.
+## Protections et limites d'autonomie
+
+Ne jamais modifier rulesets, permissions ou contrôles pour permettre une fusion.
+Si GitHub refuse, arrêter et transmettre le motif au PO. Les changements
+sensibles restent soumis à revue humaine même si GitHub accepterait la fusion.
+Toute évolution de CI, CODEOWNERS ou de cette politique suit une PR distincte
+revue humainement. Aucun agent ne fusionne vers main, même après CI verte et
+accord PO : la fusion est effectuée par un humain.
+
+Le nettoyage historique S4-SEC-004 est à ce stade une étude en lecture seule.
+Aucune réécriture, aucun force-push ni suppression de référence n'est autorisé.
+Une opération future exige un accord PO distinct couvrant sauvegarde, périmètre,
+publication, protections, restauration et impact sur main.
 
 ## QA : qualifier un SHA de dev
 
@@ -81,32 +121,14 @@ ne remplacent pas la revue visuelle et la qualification métier.
    d'auto-merge vers main. Vérifier ensuite la CI push sur le SHA de main.
 5. Aucun déploiement public n'est déclenché par ce processus.
 
-Urgence : branche fix/* depuis dev, PR et mêmes contrôles. Si dev contient du
-travail non qualifié, préparer une PR de correctif ciblée vers main seulement
-avec accord PO explicite, puis reporter le correctif vers dev par PR.
+Urgence : branche fix/* depuis dev, PR et mêmes contrôles. Toute intervention
+vers main reste une opération humaine sous contrôle exclusif du PO.
 Pour une régression, privilégier une PR de revert ; aucun reset ni force-push.
 
-## Activer une autonomie garantie ultérieurement
+## Anciennes branches — constat historique S4-OPS-001
 
-Solution simple : conserver le dépôt privé et choisir un plan donnant accès aux
-protections, avec configuration par le propriétaire. Sur dev et main : PR
-obligatoire, contrôles backend-checks/frontend-checks/compose-checks requis,
-branche à jour, interdiction force-push/suppression et aucun bypass pour agents.
-Sur main, revue PO obligatoire et aucun automatisme de fusion ; vérifier que
-les règles choisies imposent réellement cette identité (une approbation quelconque
-ne suffit pas). Séparer les identités PO et agents et limiter leurs droits.
-
-Avant d'activer l'auto-merge sur dev uniquement, faire appliquer une revue humaine
-des changements sensibles par un mécanisme de confiance, réévaluer après chaque
-commit et protéger ce mécanisme contre les modifications par les agents.
-CODEOWNERS seul, un label posé par l'auteur et un workflow modifiable par la PR
-ne suffisent pas. Tester drafts, conflits, CI échouée/annulée, nouveaux commits
-et changements sensibles sur des PR sans risque. Ne pas installer de script
-qui fusionne avec un jeton privilégié pour remplacer des protections absentes.
-
-## Anciennes branches
-
-Les 13 branches historiques ont été comparées à main : toutes sont derrière,
+Lors de S4-OPS-001, les 13 branches historiques ont été comparées à main :
+toutes étaient derrière,
 ahead_by=0. Aucune PR ouverte au début de l'audit.
 La connexion GitHub disponible n'expose aucune opération de suppression de ref.
 Aucune branche n'a donc été supprimée par cette mission. Une absence de commits
