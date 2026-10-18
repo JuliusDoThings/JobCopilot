@@ -22,6 +22,16 @@
   limitation MVP acceptée avec son attente métier inchangée.
 - Avant chaque commit, vérifier les identités Git effectives auteur et committer :
   utiliser une adresse GitHub noreply, sans adresse personnelle.
+- Après fusion réussie d'une PR vers dev, Codex doit supprimer la branche
+  distante feature/* ou fix/* associée lorsque la CI post-fusion est verte,
+  qu'aucune PR ouverte ni dépendance active ne la référence et que la suppression
+  est autorisée par les protections GitHub. En cas d'incertitude, conserver la
+  branche et signaler le motif. Appliquer les vérifications de cycle de vie
+  décrites dans docs/development-workflow.md, dont SHA de dev et SHA distant.
+- Ne jamais nettoyer automatiquement main ou dev, supprimer une branche avec PR
+  ouverte, des branches locales, worktrees ou références de PR. Une suppression
+  de branche ne nettoie pas les anciennes références de PR ni les objets Git.
 - Ne pas appeler Azure en CI, modifier les secrets, déployer publiquement,
-  désactiver des contrôles, réécrire l'historique, force-push ou supprimer des refs.
+  désactiver des contrôles, réécrire l'historique ou utiliser un force-push.
+  Seules les suppressions de branches distantes autorisées ci-dessus sont permises.
   Une réécriture historique et sa publication exigent une autorisation PO distincte.

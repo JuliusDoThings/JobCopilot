@@ -1,4 +1,4 @@
-# Développement, QA et promotion — S4-OPS-002
+# Développement, QA et promotion — S4-OPS-003
 
 ## Politique autorisée et état vérifié le 18 octobre 2026
 
@@ -63,7 +63,7 @@ sont historiques et ne décrivent plus l'état observé ci-dessus.
    Ne pas activer de fusion différée qui éviterait cette dernière vérification.
 6. Relever le SHA exact de dev après fusion et vérifier sa CI push. CI rouge :
    suspendre les intégrations, préparer correctif ou PR de revert vers dev.
-   Ne pas supprimer la branche source sans nécessité et vérification d'activité.
+   Appliquer ensuite la politique de cycle de vie ci-dessous.
 7. Faire qualifier dev par une QA indépendante de l'implémentation : testeur
    humain ou session distincte, résultats et preuves liés au SHA exact. La CI
    verte autorise l'intégration éligible ; elle ne vaut pas qualification produit.
@@ -78,9 +78,63 @@ revue humainement. Aucun agent ne fusionne vers main, même après CI verte et
 accord PO : la fusion est effectuée par un humain.
 
 Le nettoyage historique S4-SEC-004 est à ce stade une étude en lecture seule.
-Aucune réécriture, aucun force-push ni suppression de référence n'est autorisé.
+Aucune réécriture, aucun force-push ni suppression de référence historique ou
+de PR n'est autorisé. Le cycle de vie des branches de travail ci-dessous est
+une opération distincte, sans réécriture des commits.
 Une opération future exige un accord PO distinct couvrant sauvegarde, périmètre,
 publication, protections, restauration et impact sur main.
+
+## Cycle de vie des branches distantes — S4-OPS-003
+
+Après fusion réussie d'une PR vers dev, Codex doit supprimer la branche distante
+feature/* ou fix/* associée lorsque la CI post-fusion est verte, qu'aucune PR
+ouverte ni dépendance active ne la référence et que la suppression est autorisée
+par les protections GitHub. En cas d'incertitude, conserver la branche et
+signaler le motif.
+
+Avant chaque suppression :
+
+1. Vérifier sur GitHub la PR fusionnée, sa cible dev, le SHA source intégré et
+   le SHA exact de dev après fusion. Vérifier la CI push terminée avec succès
+   sur ce SHA, y compris backend-checks, frontend-checks et compose-checks.
+   Si dev a avancé, examiner les nouveaux commits et sa CI courante ; aucun
+   succès sur un ancien SHA ne suffit. Une CI rouge suspend le nettoyage.
+2. Comparer la branche à dev et démontrer l'absence de commits uniques non
+   intégrés. Un squash ou rebase demande une preuve d'équivalence examinée ;
+   une PR simplement fermée ne prouve ni intégration ni abandon autorisé.
+3. Rechercher toutes les PR ouvertes qui utilisent la branche comme source ou
+   cible, y compris les PR empilées, ainsi que les workflows actifs/en attente,
+   références dans les configurations, worktrees locaux et processus connus.
+   Vérifier les sessions et dépendances sur d'autres machines lorsque nécessaire.
+   Une dépendance active ou non vérifiable impose de conserver la branche.
+4. Exclure strictement main, dev, toute branche hors feature/* ou fix/*, et les
+   branches avec PR ouverte. Ne supprimer aucune branche locale ni worktree.
+5. Relire immédiatement avant suppression la référence distante exacte et son
+   SHA attendu ; revérifier PR ouvertes, activité et protections applicables.
+   Si le SHA ou l'état change, interrompre et réexaminer. Ne supprimer que cette
+   référence refs/heads/... via une opération GitHub standard autorisée : aucun
+   force-push, bypass, changement de ruleset ni suppression directe d'objet Git.
+   Si GitHub refuse ou si l'outil ne permet pas une suppression suffisamment
+   sûre, conserver la branche et signaler le blocage.
+6. Vérifier sur GitHub l'absence de la référence supprimée et le maintien des
+   SHA de main et dev. Rapporter branche, ancien SHA, PR, preuve d'intégration,
+   CI et résultat. Ne pas élaguer les références locales de l'utilisateur.
+
+Cette règle est une obligation de l'agent après intégration, sans ajout de bot,
+workflow privilégié ni changement du paramètre global de suppression GitHub.
+Un nettoyage rétrospectif de branches fusionnées historiquement vers main exige
+une autorisation PO explicite et les mêmes preuves d'intégration dans dev,
+absence de dépendance et respect des protections ; il ne modifie jamais main.
+
+La suppression d'une branche retire uniquement sa référence distante. Les
+références de PR, commits accessibles depuis main/dev, caches, forks, clones,
+reflogs et checkpoints peuvent conserver l'historique. Elle réduit le nombre de
+branches à traiter pour S4-SEC-005, sans remplacer son nettoyage historique.
+Toute réécriture ou publication historique exige une autorisation PO distincte.
+
+Les changements de cette politique et d'AGENTS.md sont sensibles : PR vers dev,
+CI obligatoire et validation humaine explicite ; laisser leur PR ouverte sans
+fusion automatique.
 
 ## QA : qualifier un SHA de dev
 
