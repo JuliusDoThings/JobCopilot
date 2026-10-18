@@ -4,7 +4,7 @@ version = "0.1.0"
 description = "API backend for AI Job Copilot"
 readme = "README.md"
 authors = [
-    { name = "julien-guilet", email = "guiletjulien@gmail.com" }
+    { name = "julien-guilet" }
 ]
 requires-python = ">=3.12"
 dependencies = [
